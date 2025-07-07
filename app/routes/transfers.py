@@ -14,6 +14,5 @@ async def get_transfers(request: Request):
         limit=5, 
         window=60 
     )
-
     transfers = await scrape_transfers()
     return {"query":"transfers", "results": transfers, "cache_hit": False}
