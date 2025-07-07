@@ -1260,11 +1260,6 @@ async def get_league_top_scorers(league_code: str, season: str):
                     player_url = urljoin(BASE_URL, player_link['href']) if player_link else None
                     
                     position = player_table.find_all('tr')[1].get_text(strip=True) if len(player_table.find_all('tr')) > 1 else None
-
-                    nationality = []
-                    flags = cols[2].find_all('img', class_='flaggenrahmen')
-                    for flag in flags:
-                        nationality.append(flag['title'])
                     
                     age = cols[3].get_text(strip=True)
                     
@@ -1282,7 +1277,6 @@ async def get_league_top_scorers(league_code: str, season: str):
                         'rank': cols[0].get_text(strip=True),
                         'name': player_name,
                         'position': position,
-                        'nationality': nationality,
                         'age': age,
                         'club': club,
                         'club_logo': club_logo,
@@ -1293,6 +1287,7 @@ async def get_league_top_scorers(league_code: str, season: str):
                     })
                 
                 leagues_top_scorers_cache[(league_code, season)] = scorers
+
                 return scorers
                 
     except Exception as e:
