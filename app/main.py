@@ -30,14 +30,7 @@ app.include_router(transfers.router, prefix="/transfers", tags=["transfers"])
 
 @app.get("/health")
 async def health_check():
-    return {"status": "healthy"}
-
-def print_startup_message():
-    print("\n" + "="*50)
-    print(f"🚀 Server running at: http://127.0.0.1:8000")
-    print(f"📚 API docs available at: http://127.0.0.1:8000/docs")
-    print("="*50 + "\n")
+    return {"status": "healthy", "status_code": 200}
 
 if __name__ == "__main__":
-    print_startup_message()
     uvicorn.run("app.main:app", host="0.0.0.0", port=8000, reload=True)
