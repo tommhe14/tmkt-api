@@ -926,7 +926,7 @@ async def scrape_transfers():
     
 async def scrape_transfermarkt_leagues(search_query: str):
     if search_query in leagues_search_cache:
-        return search_query[leagues_search_cache]
+        return leagues_search_cache[search_query]
     
     url = f"https://www.transfermarkt.co.uk/schnellsuche/ergebnis/schnellsuche?query={search_query.replace(' ', '+')}"
     
@@ -959,6 +959,7 @@ async def scrape_transfermarkt_leagues(search_query: str):
                                     'continent': cols[7].get_text(strip=True)
                                 })
                         break  # Found the leagues table, no need to check others
+
                 leagues_search_cache[search_query] = leagues
                 return leagues
                 
