@@ -1248,40 +1248,39 @@ async def get_league_top_scorers(league_code: str, season: str):
                 
                 for row in table.find_all('tr', class_=['odd', 'even']):
                     cols = row.find_all('td')
-                    if len(cols) < 7:
-                        continue
+                    
+                    rank = cols[0].get_text(strip=True)
                     
                     player_table = cols[1].find('table', class_='inline-table')
                     if not player_table:
                         continue
                         
-                    player_link = player_table.find('a', href=True, title=True)
+                    player_link = player_table.find('a', href=True)
                     player_name = player_link.get('title') if player_link else None
                     player_url = urljoin(BASE_URL, player_link['href']) if player_link else None
                     position = player_table.find_all('tr')[1].get_text(strip=True) if len(player_table.find_all('tr')) > 1 else None
                     
-                    nationality_img = cols[2].find('img', class_='flaggenrahmen')
-                    nationality = nationality_img['title'] if nationality_img else None
+                    flags = cols[5].find_all('img', class_='flaggenrahmen')
+                    nationality = [flag['title'] for flag in flags if flag.has_attr('title')]
                     
-                    age = cols[3].get_text(strip=True)
+                    age = cols[6].get_text(strip=True)
                     
-                    club_link = cols[4].find('a')
+                    club_link = cols[7].find('a')
                     club = club_link.get('title') if club_link else None
                     club_logo = club_link.find('img')['src'] if club_link and club_link.find('img') else None
                     
-                    appearances = cols[5].get_text(strip=True)
-                    goals = cols[6].get_text(strip=True)
+                    appearances = cols[8].get_text(strip=True)
                     
-                    photo_img = player_table.find('img', class_='bilderrahmen-fixed')
-                    photo_url = None
-                    if photo_img:
-                        photo_url = photo_img.get('data-src', photo_img.get('src'))
+                    goals = cols[9].get_text(strip=True)
+                    
+                    photo_img = cols[1].find('img', class_='bilderrahmen-fixed')
+                    photo_url = photo_img.get('data-src') or photo_img.get('src') if photo_img else None
                     
                     scorers.append({
-                        'rank': cols[0].get_text(strip=True),
+                        'rank': rank,
                         'name': player_name,
                         'position': position,
-                        'nationality': nationality,  
+                        'nationality': nationality,
                         'age': age,
                         'club': club,
                         'club_logo': club_logo,
@@ -1297,3 +1296,4 @@ async def get_league_top_scorers(league_code: str, season: str):
     except Exception as e:
         print(f"Error fetching top scorers for {league_code} season {season}: {e}")
         return []
+    
