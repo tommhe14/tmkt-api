@@ -928,16 +928,28 @@ async def scrape_transfermarkt_leagues(search_query: str):
                     if 'Competition' in headers and 'Country' in headers:
                         for row in table.find_all('tr', class_=['odd', 'even']):
                             cols = row.find_all('td')
-                            if len(cols) >= 8:  
+                            if len(cols) >= 8:
+                                league_link = cols[1].find('a', href=True)
+                                league_url = league_link['href'] if league_link else None
+                                league_code = None
+                                
+                                if league_url:
+                                    parts = league_url.split('/')
+                                    if len(parts) >= 5 and parts[-2] == 'wettbewerb':
+                                        league_code = parts[-1]
+                                
                                 leagues.append({
-                                    'name': cols[1].find('a')['title'] if cols[1].find('a') else None,
+                                    'name': league_link['title'] if league_link else None,
+                                    'code': league_code,  # Added league code
                                     'country': cols[2].find('img')['title'] if cols[2].find('img') else None,
                                     'clubs': cols[3].get_text(strip=True),
                                     'players': cols[4].get_text(strip=True),
                                     'total_value': cols[5].get_text(strip=True),
-                                    'continent': cols[7].get_text(strip=True)
+                                    'mean_value': cols[6].get_text(strip=True),
+                                    'continent': cols[7].get_text(strip=True),
+                                    'logo': cols[0].find('img')['src'] if cols[0].find('img') else None  # Added league logo
                                 })
-                        break  
+                        break
 
                 leagues_search_cache[search_query] = leagues
                 return leagues
