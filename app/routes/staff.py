@@ -17,7 +17,7 @@ async def search_staff(query: str):
 async def get_staff_profile(staff_id: str):
     try:
         profile = await get_staff_profile(staff_id)
-        return {"query": staff_id, "results": profile, "cache_hit": staff_id in staff_profile_cache}
+        return {"query": staff_id, "result": profile, "cache_hit": staff_id in staff_profile_cache}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 

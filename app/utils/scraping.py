@@ -1097,7 +1097,7 @@ def extract_staff_data(row):
         print(f"Error extracting staff data: {e}")
         return None
 
-async def get_staff_profile(staff_id: str):
+async def get_staff_profile_scraping(staff_id: str):
     """
     Get detailed profile information for a staff member (manager/coach)
     
