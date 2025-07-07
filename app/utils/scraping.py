@@ -1096,7 +1096,7 @@ def extract_staff_data(row):
     except Exception as e:
         print(f"Error extracting staff data: {e}")
         return None
-    
+
 async def get_staff_profile(staff_id: str):
     """
     Get detailed profile information for a staff member (manager/coach)
@@ -1105,11 +1105,11 @@ async def get_staff_profile(staff_id: str):
         staff_id: The Transfermarkt ID of the staff member (e.g. '47620' for Mikel Arteta)
     
     Returns:
-        Dictionary containing comprehensive staff profile information
+        Dictionary containing clean, properly structured staff profile information
     """
     if staff_id in staff_profile_cache:
         return staff_profile_cache[staff_id]
-    
+
     url = f"{BASE_URL}/-/profil/trainer/{staff_id}"
     
     try:
@@ -1119,25 +1119,40 @@ async def get_staff_profile(staff_id: str):
                 html = await response.text()
                 soup = BeautifulSoup(html, 'html.parser')
                 
-                profile_data = {}
+                profile_data = {
+                    'personal_info': {},
+                    'coaching_info': {},
+                    'current_club': {},
+                    'agent': None
+                }
                 
                 info_box = soup.find('div', class_='data-header__info-box')
                 if info_box:
                     for item in info_box.find_all('li', class_='data-header__label'):
-                        label = item.get_text(strip=True).replace(':', '').strip()
+                        label = item.get_text(strip=True).split(':')[0].strip()
                         content = item.find('span', class_='data-header__content')
-                        if content:
-                            if 'Date of birth' in label:
-                                dob_age = content.get_text(strip=True)
-                                profile_data['date_of_birth'] = dob_age.split('(')[0].strip()
-                                profile_data['age'] = dob_age.split('(')[1].replace(')', '').strip()
-                            elif 'Citizenship' in label:
-                                profile_data['citizenship'] = content.get_text(strip=True)
-                                flag = content.find('img')
-                                if flag:
-                                    profile_data['citizenship_flag'] = flag['src']
-                            else:
-                                profile_data[label.lower().replace(' ', '_')] = content.get_text(strip=True)
+                        if not content:
+                            continue
+                            
+                        content_text = content.get_text(strip=True)
+                        
+                        if 'Date of birth' in label:
+                            dob, age = content_text.split('(')
+                            profile_data['personal_info']['date_of_birth'] = dob.strip()
+                            profile_data['personal_info']['age'] = age.replace(')', '').strip()
+                        elif 'Citizenship' in label:
+                            profile_data['personal_info']['citizenship'] = content_text
+                            flag = content.find('img')
+                            if flag:
+                                profile_data['personal_info']['citizenship_flag'] = flag['src']
+                        elif 'Im Amt seit' in label:
+                            profile_data['coaching_info']['appointed'] = content_text
+                        elif 'Vertrag bis' in label:
+                            profile_data['coaching_info']['contract_expires'] = content_text
+                        elif 'Avg. term' in label:
+                            profile_data['coaching_info']['avg_term'] = content_text
+                        elif 'Preferred formation' in label:
+                            profile_data['coaching_info']['preferred_formation'] = content_text
                 
                 spielerdaten = soup.find('div', class_='spielerdaten')
                 if spielerdaten:
@@ -1146,41 +1161,43 @@ async def get_staff_profile(staff_id: str):
                         for row in table.find_all('tr'):
                             th = row.find('th')
                             td = row.find('td')
-                            if th and td:
-                                key = th.get_text(strip=True).replace(':', '').lower().replace(' ', '_')
-                                value = td.get_text(strip=True)
+                            if not th or not td:
+                                continue
                                 
-                                if 'name_in_home_country' in key:
-                                    profile_data['full_name'] = value
-                                elif 'place_of_birth' in key:
-                                    profile_data['place_of_birth'] = value.split('  ')[0].strip()
-                                    flag = td.find('img')
-                                    if flag:
-                                        profile_data['birth_country_flag'] = flag['src']
-                                elif 'agent' in key:
-                                    agent_link = td.find('a')
-                                    if agent_link:
-                                        profile_data['agent'] = {
-                                            'name': agent_link.get_text(strip=True),
-                                            'url': urljoin(BASE_URL, agent_link['href'])
-                                        }
-                                else:
-                                    profile_data[key] = value
+                            key = th.get_text(strip=True).split(':')[0].strip().lower().replace(' ', '_')
+                            value = td.get_text(strip=True)
+                            
+                            if 'name_in_home_country' in key:
+                                profile_data['personal_info']['full_name'] = value
+                            elif 'place_of_birth' in key:
+                                profile_data['personal_info']['place_of_birth'] = value.split('  ')[0].strip()
+                                flag = td.find('img')
+                                if flag:
+                                    profile_data['personal_info']['birth_country_flag'] = flag['src']
+                            elif 'coaching_licence' in key:
+                                profile_data['coaching_info']['licence'] = value
+                            elif 'agent' in key:
+                                agent_link = td.find('a')
+                                if agent_link:
+                                    profile_data['agent'] = {
+                                        'name': agent_link.get_text(strip=True),
+                                        'url': urljoin(BASE_URL, agent_link['href'])
+                                    }
                 
                 current_club = soup.find('div', class_='data-header__club-info')
                 if current_club:
                     club_link = current_club.find('a')
                     if club_link:
-                        profile_data['current_club'] = {
-                            'name': club_link.get('title'),
-                            'url': urljoin(BASE_URL, club_link['href'])
-                        }
+                        profile_data['current_club']['name'] = club_link.get('title')
+                        profile_data['current_club']['url'] = urljoin(BASE_URL, club_link['href'])
                         club_img = club_link.find('img')
                         if club_img:
                             profile_data['current_club']['logo'] = club_img['src']
                 
-                profile_data['profile_url'] = url
+                if not profile_data['agent']:
+                    del profile_data['agent']
                 
+                profile_data['profile_url'] = url
                 staff_profile_cache[staff_id] = profile_data
                 return profile_data
                 
@@ -1188,4 +1205,3 @@ async def get_staff_profile(staff_id: str):
         print(f"Error fetching staff profile {staff_id}: {e}")
         return None
 
-    
