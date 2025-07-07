@@ -1,6 +1,6 @@
 # Transfermarkt API
 
-A FastAPI-powered web service that provides football data scraped from Transfermarkt.
+A fully dynamic and lightweight API for [Transfermarkt](https://www.transfermarkt.co.uk/).
 
 ## Base URL
 
@@ -10,8 +10,8 @@ The API is available at:
 ## Documentation
 
 Interactive API documentation (Swagger UI) is available at:  
-[https://tmkt-api-production.up.railway.app/docs](https://tmkt-api-production.up.railway.app/)  
-[https://tmkt-api-production.up.railway.app/redoc](https://tmkt-api-production.up.railway.app/redoc) (alternative docs)
+[TMKT API DOCS](https://tmkt-api-production.up.railway.app/)  
+[TMKT API REDOC](https://tmkt-api-production.up.railway.app/redoc) (alternative docs)
 
 
 ## Usage Example
