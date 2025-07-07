@@ -2,12 +2,13 @@ import aiohttp
 
 from bs4 import BeautifulSoup
 import re
+from urllib.parse import urljoin
 
 from datetime import datetime
 
 import traceback
 
-from .cache import player_search_cache, club_search_cache, player_profile_cache, player_transfers_cache, leagues_search_cache, player_injuries_cache, player_stats_cache, club_profile_cache, club_squad_cache, club_transfers_cache
+from .cache import player_search_cache, club_search_cache, player_profile_cache, player_transfers_cache, leagues_search_cache, player_injuries_cache, player_stats_cache, club_profile_cache, club_squad_cache, club_transfers_cache, staff_search_cache, staff_profile_cache
 
 BASE_URL = "https://www.transfermarkt.co.uk"
 
@@ -1003,4 +1004,188 @@ async def fetch_player_injuries(player_id: str):
     except Exception as e:
         print(f"Error fetching injuries for player {player_id}: {e}")
         return []
+    
+async def search_club_staff(query: str):
+    """
+    Search for club staff (managers, coaches) on Transfermarkt
+    
+    Args:
+        query: Name of the staff member to search for (e.g. "Mikel Arteta")
+    
+    Returns:
+        List of dictionaries containing staff information with keys:
+        - name: Staff member's name
+        - position: Their role (Manager, Coach, etc.)
+        - nationality: Country flag
+        - club: Current club
+        - club_logo: URL of club logo
+        - contract_end: Contract expiration date
+        - profile_url: URL to staff profile
+        - photo_url: URL to staff photo
+    """
+    if query in staff_search_cache:
+        return staff_search_cache[query]
+    
+    url = f"{BASE_URL}/schnellsuche/ergebnis/schnellsuche?query={query.replace(' ', '+')}"
+    
+    try:
+        async with aiohttp.ClientSession(headers=headers) as session:
+            async with session.get(url) as response:
+                response.raise_for_status()
+                html = await response.text()
+                
+                soup = BeautifulSoup(html, 'html.parser')
+                staff_list = []
+                
+                for table in soup.find_all('table', class_='items'):
+                    staff_headers = [th.get_text(strip=True) for th in table.find_all('th')]
+                    if 'Name' in staff_headers and 'Club' in staff_headers and 'Contract until' in staff_headers:
+                        for row in table.find_all('tr', class_=['odd', 'even']):
+                            staff_data = extract_staff_data(row)
+                            if staff_data:
+                                staff_list.append(staff_data)
+
+                staff_search_cache[query] = staff_list
+                return staff_list
+                
+    except Exception as e:
+        print(f"Error searching for staff: {e}")
+        return []
+
+def extract_staff_data(row):
+    """Extracts staff data from a table row with the new structure including ID"""
+    try:
+        profile_link = row.find('a', href=True, title=True)
+        if not profile_link:
+            return None
+
+        href = profile_link.get('href', '')
+        staff_id = href.split('/')[-1] if href and href.split('/') else None
+        
+        name = profile_link.get('title', '').strip()
+        
+        photo_img = row.find('img', class_='bilderrahmen-fixed')
+        photo_url = photo_img['src'] if photo_img else None
+        
+        position_td = row.find_all('td', class_='rechts')
+        position = position_td[0].get_text(strip=True) if position_td else None
+        
+        nationality_img = row.find('img', class_='flaggenrahmen')
+        nationality = nationality_img['title'] if nationality_img else None
+        
+        club_link = row.find('a', href=lambda x: x and '/verein/' in x)
+        club = club_link.get('title') if club_link else None
+        
+        club_img = row.find('img', class_='tiny_wappen')
+        club_logo = club_img['src'] if club_img else None
+        
+        contract_end = position_td[1].get_text(strip=True) if len(position_td) > 1 else None
+        
+        return {
+            'id': staff_id,  
+            'name': name,
+            'position': position,
+            'nationality': nationality,
+            'club': club,
+            'club_logo': club_logo,
+            'contract_end': contract_end,
+            'profile_url': urljoin(BASE_URL, profile_link['href']),
+            'photo_url': photo_url
+        }
+        
+    except Exception as e:
+        print(f"Error extracting staff data: {e}")
+        return None
+    
+async def get_staff_profile(staff_id: str):
+    """
+    Get detailed profile information for a staff member (manager/coach)
+    
+    Args:
+        staff_id: The Transfermarkt ID of the staff member (e.g. '47620' for Mikel Arteta)
+    
+    Returns:
+        Dictionary containing comprehensive staff profile information
+    """
+    if staff_id in staff_profile_cache:
+        return staff_profile_cache[staff_id]
+    
+    url = f"{BASE_URL}/-/profil/trainer/{staff_id}"
+    
+    try:
+        async with aiohttp.ClientSession(headers=headers) as session:
+            async with session.get(url) as response:
+                response.raise_for_status()
+                html = await response.text()
+                soup = BeautifulSoup(html, 'html.parser')
+                
+                profile_data = {}
+                
+                info_box = soup.find('div', class_='data-header__info-box')
+                if info_box:
+                    for item in info_box.find_all('li', class_='data-header__label'):
+                        label = item.get_text(strip=True).replace(':', '').strip()
+                        content = item.find('span', class_='data-header__content')
+                        if content:
+                            if 'Date of birth' in label:
+                                dob_age = content.get_text(strip=True)
+                                profile_data['date_of_birth'] = dob_age.split('(')[0].strip()
+                                profile_data['age'] = dob_age.split('(')[1].replace(')', '').strip()
+                            elif 'Citizenship' in label:
+                                profile_data['citizenship'] = content.get_text(strip=True)
+                                flag = content.find('img')
+                                if flag:
+                                    profile_data['citizenship_flag'] = flag['src']
+                            else:
+                                profile_data[label.lower().replace(' ', '_')] = content.get_text(strip=True)
+                
+                spielerdaten = soup.find('div', class_='spielerdaten')
+                if spielerdaten:
+                    table = spielerdaten.find('table', class_='auflistung')
+                    if table:
+                        for row in table.find_all('tr'):
+                            th = row.find('th')
+                            td = row.find('td')
+                            if th and td:
+                                key = th.get_text(strip=True).replace(':', '').lower().replace(' ', '_')
+                                value = td.get_text(strip=True)
+                                
+                                if 'name_in_home_country' in key:
+                                    profile_data['full_name'] = value
+                                elif 'place_of_birth' in key:
+                                    profile_data['place_of_birth'] = value.split('  ')[0].strip()
+                                    flag = td.find('img')
+                                    if flag:
+                                        profile_data['birth_country_flag'] = flag['src']
+                                elif 'agent' in key:
+                                    agent_link = td.find('a')
+                                    if agent_link:
+                                        profile_data['agent'] = {
+                                            'name': agent_link.get_text(strip=True),
+                                            'url': urljoin(BASE_URL, agent_link['href'])
+                                        }
+                                else:
+                                    profile_data[key] = value
+                
+                current_club = soup.find('div', class_='data-header__club-info')
+                if current_club:
+                    club_link = current_club.find('a')
+                    if club_link:
+                        profile_data['current_club'] = {
+                            'name': club_link.get('title'),
+                            'url': urljoin(BASE_URL, club_link['href'])
+                        }
+                        club_img = club_link.find('img')
+                        if club_img:
+                            profile_data['current_club']['logo'] = club_img['src']
+                
+                profile_data['profile_url'] = url
+                
+                staff_profile_cache[staff_id] = profile_data
+                return profile_data
+                
+    except Exception as e:
+        print(f"Error fetching staff profile {staff_id}: {e}")
+        return None
+
     

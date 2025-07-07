@@ -5,7 +5,7 @@ from pathlib import Path
 sys.path.append(str(Path(__file__).parent.parent))  # Add project root to Python path
 import uvicorn
 
-from app.routes import players, clubs, matches, transfers, leagues
+from app.routes import players, clubs, matches, transfers, leagues, staff
 
 app = FastAPI(
     title="Transfermarkt API",
@@ -28,6 +28,7 @@ app.include_router(clubs.router, prefix="/clubs", tags=["clubs"])
 app.include_router(matches.router, prefix="/matches", tags=["matches"])
 app.include_router(transfers.router, prefix="/transfers", tags=["transfers"])
 app.include_router(leagues.router, prefix="/leagues", tags=["leagues"])
+app.include_router(staff.router, prefix="/staff", tags=["staff"])
 
 @app.get("/health")
 async def health_check():
