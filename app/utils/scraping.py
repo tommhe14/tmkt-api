@@ -1,13 +1,16 @@
 import aiohttp
+
 from bs4 import BeautifulSoup
 import re
-import traceback
-from .cache import player_search_cache, club_search_cache, player_profile_cache, player_transfers_cache, leagues_search_cache
 
 from datetime import datetime
 
-import asyncio
-import json
+import traceback
+
+from .cache import player_search_cache, club_search_cache, player_profile_cache, player_transfers_cache, leagues_search_cache, player_injuries_cache, player_stats_cache, club_profile_cache, club_squad_cache, club_transfers_cache
+
+BASE_URL = "https://www.transfermarkt.co.uk"
+
 headers = {
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36"
     }
@@ -91,9 +94,6 @@ def extract_team_id(url: str) -> str:
     if not url:
         return None
     parts = url.split('/')
-    # Handle both formats:
-    # /anapolis-futebol-clube-go-/spielplan/verein/17568
-    # /verein/17568/anapolis-futebol-clube-go-
     if 'verein' in parts:
         verein_index = parts.index('verein')
         if verein_index + 1 < len(parts):
@@ -119,7 +119,6 @@ async def scrape_todays_matches(date: str = None):
         competition_id = competition_section.select_one('h2 a').get('href').split('/')[-1]
         
         for row in competition_section.find_next('table', class_='livescore').select('tr.begegnungZeile'):
-            # Extract status
             if row.select_one('span.live-ergebnis'):
                 status = 'live'
             elif 'finished' in row.select_one('span.matchresult').get('class', []):
@@ -127,7 +126,6 @@ async def scrape_todays_matches(date: str = None):
             else:
                 status = 'scheduled'
             
-            # Extract team info with proper ID handling
             home_team_a = row.select_one('td.verein-heim a')
             away_team_a = row.select_one('td.verein-gast a')
             
@@ -311,7 +309,10 @@ async def scrape_player_profile(player_id: str):
         raise
 
 async def scrape_player_stats(player_id: str, season: str = None):    
-    # Build the URL based on whether season is provided
+
+    if (player_id, season) in player_stats_cache:
+        return player_stats_cache[(player_id, season)]
+    
     if season:
         url = f"https://www.transfermarkt.co.uk/-/leistungsdaten/spieler/{player_id}/plus/0?saison={season}"
     else:
@@ -325,12 +326,10 @@ async def scrape_player_stats(player_id: str, season: str = None):
     
     soup = BeautifulSoup(html, 'html.parser')
     
-    # Find the main stats table
     stats_table = soup.find('table', class_='items')
     if not stats_table:
         raise Exception("Player stats table not found")
     
-    # Initialize response data
     stats_data = {
         "player_id": player_id,
         "season": season if season else "all-time",
@@ -338,7 +337,6 @@ async def scrape_player_stats(player_id: str, season: str = None):
         "competitions": []
     }
     
-    # Extract total stats if available (found in tfoot)
     tfoot = stats_table.find('tfoot')
     if tfoot:
         total_row = tfoot.find('tr')
@@ -355,7 +353,6 @@ async def scrape_player_stats(player_id: str, season: str = None):
                     "minutes_played": total_cells[8].get_text(strip=True) if len(total_cells) > 8 and total_cells[8].get_text(strip=True) else "0"
                 }
     
-    # Extract competition-specific stats
     tbody = stats_table.find('tbody')
     if tbody:
         for row in tbody.find_all('tr', class_=['odd', 'even']):
@@ -383,6 +380,7 @@ async def scrape_player_stats(player_id: str, season: str = None):
                     "minutes_played": cells[8].get_text(strip=True) if cells[8].get_text(strip=True) else "0"
                 })
     
+    player_stats_cache[(player_id, season)] = stats_data
     return stats_data
 
 async def get_team_name(team_id: str) -> str:
@@ -509,6 +507,9 @@ async def scrape_club_profile(club_id: str):
     Returns:
         Dictionary containing all extracted club data
     """
+    if club_id in club_profile_cache:
+        return club_profile_cache[club_id]
+    
     url = f"https://www.transfermarkt.co.uk/-/startseite/verein/{club_id}"
     
     try:
@@ -520,20 +521,16 @@ async def scrape_club_profile(club_id: str):
                 html = await response.text()
                 soup = BeautifulSoup(html, 'html.parser')
                 
-                # Extract basic info
                 header = soup.find('header', class_='data-header')
                 if not header:
                     raise Exception("Club profile header not found")
                 
-                # Club name
                 name_element = header.find('h1', class_='data-header__headline-wrapper')
                 club_name = name_element.get_text(strip=True) if name_element else None
                 
-                # Club logo
                 logo_element = header.find('img', src=lambda x: x and 'wappen/head' in x)
                 club_logo = logo_element['src'] if logo_element else None
                 
-                # Trophies
                 trophies = []
                 for trophy in header.select('.data-header__success-data'):
                     img = trophy.find('img')
@@ -545,7 +542,6 @@ async def scrape_club_profile(club_id: str):
                             'image': img.get('data-src', '')
                         })
                 
-                # League info
                 league_info = {}
                 league_link = header.find('span', class_='data-header__club').find('a')
                 if league_link:
@@ -554,10 +550,8 @@ async def scrape_club_profile(club_id: str):
                         'id': league_link['href'].split('/')[-1]
                     }
                 
-                # Squad info - find the info boxes
                 info_boxes = header.find_all('div', class_='data-header__details')
                 
-                # Initialize all squad info variables
                 squad_size = None
                 avg_age = None
                 foreigners_count = None
@@ -587,7 +581,6 @@ async def scrape_club_profile(club_id: str):
                         elif 'Current transfer record:' in text:
                             transfer_record = item.find('a').get_text(strip=True) if item.find('a') else None
                 
-                # Market value
                 market_value_a = header.find('a', class_='data-header__market-value-wrapper')
                 if market_value_a:
                     market_value_text = market_value_a.get_text(' ', strip=True)
@@ -601,7 +594,7 @@ async def scrape_club_profile(club_id: str):
                         'last_update': None
                     }
                 
-                return {
+                returnData = {
                     'club_id': club_id,
                     'name': club_name,
                     'logo': club_logo,
@@ -623,6 +616,9 @@ async def scrape_club_profile(club_id: str):
                     'transfer_record': transfer_record,
                     'market_value': market_value
                 }
+
+                club_profile_cache[club_id] = returnData
+                return returnData
     
     except Exception as e:
         raise Exception(f"Failed to scrape club profile: {str(e)}")
@@ -638,7 +634,9 @@ async def scrape_club_squad(club_id: str):
     Returns:
         List of player dictionaries with complete details
     """
-    # Correct squad URL structure
+    if club_id in club_squad_cache:
+        return club_squad_cache[club_id]
+    
     url = f"https://www.transfermarkt.co.uk/-/startseite/verein/{club_id}"
     
     try:
@@ -651,38 +649,30 @@ async def scrape_club_squad(club_id: str):
                 soup = BeautifulSoup(html, "html.parser")
                 players = []
                 
-                for row in soup.select("table.items tr")[1:]:  # Skip header row
+                for row in soup.select("table.items tr")[1:]: 
                     cols = row.find_all("td")
-                    if len(cols) < 8:  # Ensure we have all columns
+                    if len(cols) < 8: 
                         continue
 
                     try:
-                        # Player number
                         number = cols[0].text.strip()
                         
-                        # Player image
                         image_url = cols[2].select_one("img")
                         image_url = image_url["data-src"] if image_url and "data-src" in image_url.attrs else None
                         
-                        # Player name and ID
                         player_link_tag = cols[3].select_one("a")
                         player_name = player_link_tag.text.strip() if player_link_tag else None
                         player_id = player_link_tag["href"].split("/")[-1] if player_link_tag else None
                         
-                        # Position
                         position = cols[4].text.strip()
                         
-                        # Date of birth
                         dob = cols[5].text.strip()
                         
-                        # Nationality
                         nationality_img = cols[6].select_one("img")
                         nationality = nationality_img["title"] if nationality_img else None
                         
-                        # Market value
                         market_value = cols[7].text.strip()
                         
-                        # Injury status
                         injury_tag = player_link_tag.select_one("span.verletzt-table.icons_sprite") if player_link_tag else None
                         injury_status = injury_tag["title"] if injury_tag else None
 
@@ -700,16 +690,20 @@ async def scrape_club_squad(club_id: str):
                     except Exception as e:
                         print(f"Error processing player row: {e}")
                         continue
-
+                
+                club_squad_cache[club_id] = players
                 return players
     
     except Exception as e:
         print(traceback.format_exc())
         raise Exception(f"Failed to scrape squad: {str(e)}")
 
-async def scrape_transfers(team_id: int, season: int):
+async def scrape_transfers(club_id: int, season: int):
     """Scrape transfers for a specific team and season"""
-    transfers_url = f"https://www.transfermarkt.co.uk/-/transfers/verein/{team_id}/saison_id/{season}"
+    if (club_id, season) in club_transfers_cache:
+        return club_transfers_cache[(club_id, season)]
+
+    transfers_url = f"https://www.transfermarkt.co.uk/-/transfers/verein/{club_id}/saison_id/{season}"
     
     try:
         async with aiohttp.ClientSession(headers=headers) as session:
@@ -722,7 +716,6 @@ async def scrape_transfers(team_id: int, season: int):
                 soup = BeautifulSoup(html, "html.parser")
                 transfers = []
 
-                # Process both incoming and outgoing tables
                 for table_type in ["Arrivals", "Departures"]:
                     table_header = soup.find("h2", string=lambda text: text and table_type in text)
                     if table_header:
@@ -732,6 +725,8 @@ async def scrape_transfers(team_id: int, season: int):
                                 transfer = await process_transfer_row(row, table_type.lower()[:-1])
                                 if transfer:
                                     transfers.append(transfer)
+
+                club_transfers_cache[(club_id, season)] = transfers
                 return transfers
     except Exception as e:
         print(f"Error scraping transfers: {str(e)}")
@@ -740,7 +735,6 @@ async def scrape_transfers(team_id: int, season: int):
 async def process_transfer_row(row, transfer_type):
     """Process a single transfer row with improved error handling"""
     try:
-        # Player name and ID
         player_name_elem = row.select_one("td.hauptlink a[title]")
         if not player_name_elem:
             return None
@@ -749,23 +743,18 @@ async def process_transfer_row(row, transfer_type):
         player_href = player_name_elem.get("href", "")
         player_id = player_href.split("/")[-1] if player_href else None
         
-        # Age
         age_elem = row.select_one("td.zentriert:not([colspan])")
         age = int(age_elem.text.strip()) if age_elem and age_elem.text.strip().isdigit() else None
         
-        # Nationality
         nationality_elem = row.select_one("td.zentriert img.flaggenrahmen")
         nationality = nationality_elem.get("title") if nationality_elem else None
         
-        # Position
         position_elem = row.select_one("td table.inline-table tr:nth-of-type(2) td")
         position = position_elem.text.strip() if position_elem else None
         
-        # Club (either left or joining club)
         club_elem = row.select_one("td img.tiny_wappen")
         club = club_elem.get("title") if club_elem else None
         
-        # Fee handling
         fee_elem = row.select_one("td.rechts.hauptlink a")
         fee = "Free"
         loan_end_date = None
@@ -780,10 +769,8 @@ async def process_transfer_row(row, transfer_type):
                 fee = "Loan Transfer"
             elif "€" in fee_text:
                 fee = fee_text.replace("€", "€ ").replace("\u20ac", "€")
-                # Clean up the fee format
                 fee = fee.replace("m", "M").replace("bn", "B").strip()
         
-        # Player image
         player_logo_elem = row.select_one("img.bilderrahmen-fixed")
         player_logo = player_logo_elem.get("data-src") if player_logo_elem else None
 
@@ -824,11 +811,11 @@ async def scrape_transfers():
             transfers = []
 
             if table:
-                rows = table.find_all('tr')[1:]  # Skip the header row
+                rows = table.find_all('tr')[1:]  
 
                 for row in rows:
                     columns = row.find_all('td')
-                    if len(columns) < 15:  # Skip rows that don't have enough columns
+                    if len(columns) < 15:  
                         continue
 
                     player_info = {
@@ -848,7 +835,6 @@ async def scrape_transfers():
                         'player_id': ''
                     }
 
-                    # Player info (name, position, logo)
                     player_info_table = columns[0].find('table', {'class': 'inline-table'})
                     if player_info_table:
                         info_rows = player_info_table.find_all('tr')
@@ -870,15 +856,12 @@ async def scrape_transfers():
                             if player_logo_img:
                                 player_info['player_logo'] = player_logo_img.get('data-src', '')
 
-                    # Age
                     player_info['age'] = columns[4].get_text(strip=True)
 
-                    # Nationality
                     nationality_img = columns[5].find('img')
                     if nationality_img:
                         player_info['nationality'] = nationality_img.get('title', 'N/A')
 
-                    # Current club info
                     current_club_table = columns[10].find('table', {'class': 'inline-table'})
                     if current_club_table:
                         current_club_rows = current_club_table.find_all('tr')
@@ -894,7 +877,6 @@ async def scrape_transfers():
                             if current_club_league_td:
                                 player_info['current_club_league'] = current_club_league_td.get_text(strip=True)
 
-                    # Previous club info
                     previous_club_table = columns[6].find('table', {'class': 'inline-table'})
                     if previous_club_table:
                         previous_club_rows = previous_club_table.find_all('tr')
@@ -911,7 +893,6 @@ async def scrape_transfers():
                             if previous_club_nationality_img:
                                 player_info['previous_club_nationality'] = previous_club_nationality_img.get('title', '').strip()
 
-                    # Transfer fee
                     transfer_fee_a = columns[14].find('a')
                     if transfer_fee_a:
                         player_info['transfer_fee'] = transfer_fee_a.get_text(strip=True)
@@ -941,15 +922,12 @@ async def scrape_transfermarkt_leagues(search_query: str):
                 soup = BeautifulSoup(html, 'html.parser')
                 leagues = []
                 
-                # Find all tables with class 'items'
                 for table in soup.find_all('table', class_='items'):
-                    # Check if this is the leagues table by looking at column headers
                     headers = [th.get_text(strip=True) for th in table.find_all('th')]
                     if 'Competition' in headers and 'Country' in headers:
-                        # This is the leagues table
                         for row in table.find_all('tr', class_=['odd', 'even']):
                             cols = row.find_all('td')
-                            if len(cols) >= 8:  # Ensure we have all columns
+                            if len(cols) >= 8:  
                                 leagues.append({
                                     'name': cols[1].find('a')['title'] if cols[1].find('a') else None,
                                     'country': cols[2].find('img')['title'] if cols[2].find('img') else None,
@@ -958,7 +936,7 @@ async def scrape_transfermarkt_leagues(search_query: str):
                                     'total_value': cols[5].get_text(strip=True),
                                     'continent': cols[7].get_text(strip=True)
                                 })
-                        break  # Found the leagues table, no need to check others
+                        break  
 
                 leagues_search_cache[search_query] = leagues
                 return leagues
@@ -966,5 +944,63 @@ async def scrape_transfermarkt_leagues(search_query: str):
     except Exception as e:
         print(f"Error scraping leagues: {e}")
         return []
+
+async def fetch_player_injuries(player_id: str):
+    """
+    Fetches injury history for a player by their Transfermarkt ID
+    Returns a list of dictionaries containing injury data
+    """
+    if player_id in player_injuries_cache:
+        return player_injuries_cache[player_injuries_cache]
     
-#asyncio.run(scrape_transfermarkt_leagues("premier league"))
+    url = f"{BASE_URL}/-/verletzungen/spieler/{player_id}"
+    
+    try:
+        async with aiohttp.ClientSession(headers=headers) as session:
+            async with session.get(url) as response:
+                response.raise_for_status()
+                html = await response.text()
+                
+                soup = BeautifulSoup(html, 'html.parser')
+                table = soup.find('table', {'class': 'items'})
+                
+                if not table:
+                    return []
+                
+                injuries = []
+                for row in table.find_all('tr', class_=['odd', 'even']):
+                    cols = row.find_all('td')
+                    if len(cols) < 6:
+                        continue
+                    
+                    team_elements = cols[5].find_all('a')
+                    teams = []
+                    for team in team_elements:
+                        if 'verein' in team['href']:
+                            teams.append({
+                                'name': team.get('title'),
+                                'type': 'club' if 'verein' in team['href'] else 'national team',
+                                'image': team.find('img')['src'] if team.find('img') else None
+                            })
+                    
+                    games_missed = cols[5].get_text(strip=True)
+                    if cols[5].find('span'):
+                        games_missed = cols[5].find('span').get_text(strip=True)
+                    
+                    injuries.append({
+                        'season': cols[0].get_text(strip=True),
+                        'injury': cols[1].get_text(strip=True),
+                        'from_date': cols[2].get_text(strip=True),
+                        'until_date': cols[3].get_text(strip=True),
+                        'duration': cols[4].get_text(strip=True),
+                        'games_missed': games_missed,
+                        'teams_affected': teams
+                    })
+
+                player_injuries_cache[player_id] = injuries
+                return injuries
+                
+    except Exception as e:
+        print(f"Error fetching injuries for player {player_id}: {e}")
+        return []
+    

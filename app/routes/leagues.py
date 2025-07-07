@@ -1,4 +1,5 @@
-from fastapi import APIRouter, HTTPException, Response
+from fastapi import APIRouter, HTTPException
+
 from ..utils.cache import leagues_search_cache
 from ..utils.scraping import scrape_transfermarkt_leagues
 

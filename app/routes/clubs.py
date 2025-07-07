@@ -1,6 +1,7 @@
-from fastapi import APIRouter, HTTPException, Response
+from fastapi import APIRouter, HTTPException
+
 from ..utils.scraping import fetch_transfermarkt_clubs, scrape_club_profile, scrape_club_squad, scrape_transfers
-from ..utils.cache import club_search_cache
+from ..utils.cache import club_search_cache, club_profile_cache, club_squad_cache, club_transfers_cache
 
 from datetime import datetime
 
@@ -32,13 +33,11 @@ async def search_clubs(query: str):
     
 @router.get("/{club_id}")
 async def get_club_profile(
-    club_id: str, 
-    response: Response
+    club_id: str
 ):
     try:
         data = await scrape_club_profile(club_id)
-        response.headers["Cache-Control"] = "public, max-age=3600"  
-        return {"query": club_id, "data": data}
+        return {"query": club_id, "data": data, "cache_hit": club_id in club_profile_cache}
     except Exception as e:
         raise HTTPException(
             status_code=500,
@@ -46,7 +45,7 @@ async def get_club_profile(
         )
     
 @router.get("/{club_id}/squad")
-async def get_club_squad(club_id: int, response: Response):
+async def get_club_squad(club_id: int):
     """
     Get detailed squad information for a club from Transfermarkt
     
@@ -58,10 +57,10 @@ async def get_club_squad(club_id: int, response: Response):
     """
     try:
         squad_data = await scrape_club_squad(str(club_id))
-        response.headers["Cache-Control"] = "public, max-age=3600"  
         return {
-            "club_id": club_id,
-            "squad": squad_data
+            "query": club_id,
+            "result": squad_data,
+            "cache_hit":club_id in club_squad_cache
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
@@ -69,8 +68,7 @@ async def get_club_squad(club_id: int, response: Response):
 @router.get("/{team_id}/transfers")
 async def get_team_transfers(
     team_id: int,
-    season: int, 
-    response: Response = None
+    season: int
 ):
     """
     Get transfer history for a team by ID and season
@@ -84,15 +82,15 @@ async def get_team_transfers(
     """
     try:
         # Set cache headers
-        response.headers["Cache-Control"] = "public, max-age=86400"
         
         # Call scraping function with team_id and season
         transfers = await scrape_transfers(team_id, season)
         
         return {
-            "team_id": team_id,
+            "query": team_id,
             "season": season,
-            "transfers": transfers
+            "results": transfers,
+            "cache_hit": (team_id, season) in club_transfers_cache
         }
         
     except Exception as e:

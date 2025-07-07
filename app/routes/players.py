@@ -1,6 +1,7 @@
-from fastapi import APIRouter, HTTPException, Response
+from fastapi import APIRouter, HTTPException
+
 from ..utils.scraping import fetch_transfermarkt_players, scrape_player_profile, scrape_player_stats, get_player_transfers
-from ..utils.cache import player_search_cache, player_profile_cache
+from ..utils.cache import player_search_cache, player_profile_cache, player_injuries_cache, player_stats_cache, player_transfers_cache
 
 router = APIRouter()
 
@@ -50,8 +51,7 @@ async def get_player_profile(player_id: str):
     
 @router.get("/{player_id}/stats")
 async def get_player_stats(
-    player_id: str, 
-    response: Response,
+    player_id: str,
     season: str = None 
 ):
     """
@@ -66,8 +66,7 @@ async def get_player_stats(
     """
     try:
         stats = await scrape_player_stats(player_id, season)
-        response.headers["Cache-Control"] = "public, max-age=3600" 
-        return {"query": player_id, "data": stats}
+        return {"query": player_id, "results": stats, "cache_hit": (player_id, season) in player_stats_cache}
     except Exception as e:
         raise HTTPException(
             status_code=500,
@@ -76,13 +75,24 @@ async def get_player_stats(
     
 @router.get("/{player_id}/transfers")
 async def get_player_transfers_request(
-    player_id: str, 
-    response: Response
+    player_id: str
 ):
     try:
         data = await get_player_transfers(player_id)
-        response.headers["Cache-Control"] = "public, max-age=3600"  
-        return {"query": player_id, "data": data}
+        return {"query": player_id, "results": data, "cache_hit": player_id in player_transfers_cache}
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Error fetching player transfers: {str(e)}"
+        )
+    
+@router.get("/{player_id}/injuries")
+async def get_player_injuries(
+    player_id: str
+):
+    try:
+        data = await get_player_transfers(player_id)
+        return {"query": player_id, "results": data, "cache_hit": player_id in player_injuries_cache}
     except Exception as e:
         raise HTTPException(
             status_code=500,

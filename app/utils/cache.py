@@ -2,6 +2,13 @@ from cachetools import TTLCache
 
 player_search_cache = TTLCache(maxsize=1000, ttl=3600)
 player_profile_cache = TTLCache(maxsize=1000, ttl=3600)
-club_search_cache = TTLCache(maxsize=1000, ttl=3600)
 player_transfers_cache = TTLCache(maxsize=1000, ttl=3600)
+player_injuries_cache = TTLCache(maxsize=1000, ttl=3600)
+player_stats_cache = TTLCache(maxsize=1000, ttl=3600)
+
+club_search_cache = TTLCache(maxsize=1000, ttl=3600)
+club_profile_cache = TTLCache(maxsize=1000, ttl=3600)
+club_squad_cache = TTLCache(maxsize=1000, ttl=3600)
+club_transfers_cache = TTLCache(maxsize=1000, ttl=3600)
+
 leagues_search_cache = TTLCache(maxsize=1000, ttl=3600)
