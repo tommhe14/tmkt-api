@@ -1,6 +1,6 @@
 # Transfermarkt API
 
-A FastAPI-powered web service that provides football data scraped from Transfermarkt.
+A fully dynamic and lightweight API for [Transfermarkt](https://www.transfermarkt.co.uk/).
 
 ## Base URL
 
