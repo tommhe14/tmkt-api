@@ -1258,8 +1258,10 @@ async def get_league_top_scorers(league_code: str, season: str):
                     player_link = player_table.find('a', href=True, title=True)
                     player_name = player_link.get('title') if player_link else None
                     player_url = urljoin(BASE_URL, player_link['href']) if player_link else None
-                    
                     position = player_table.find_all('tr')[1].get_text(strip=True) if len(player_table.find_all('tr')) > 1 else None
+                    
+                    nationality_img = cols[2].find('img', class_='flaggenrahmen')
+                    nationality = nationality_img['title'] if nationality_img else None
                     
                     age = cols[3].get_text(strip=True)
                     
@@ -1271,12 +1273,15 @@ async def get_league_top_scorers(league_code: str, season: str):
                     goals = cols[6].get_text(strip=True)
                     
                     photo_img = player_table.find('img', class_='bilderrahmen-fixed')
-                    photo_url = photo_img['data-src'] if photo_img and 'data-src' in photo_img.attrs else photo_img['src'] if photo_img else None
+                    photo_url = None
+                    if photo_img:
+                        photo_url = photo_img.get('data-src', photo_img.get('src'))
                     
                     scorers.append({
                         'rank': cols[0].get_text(strip=True),
                         'name': player_name,
                         'position': position,
+                        'nationality': nationality,  
                         'age': age,
                         'club': club,
                         'club_logo': club_logo,
@@ -1287,7 +1292,6 @@ async def get_league_top_scorers(league_code: str, season: str):
                     })
                 
                 leagues_top_scorers_cache[(league_code, season)] = scorers
-
                 return scorers
                 
     except Exception as e:
