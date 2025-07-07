@@ -2,7 +2,7 @@ import aiohttp
 from bs4 import BeautifulSoup
 import re
 import traceback
-#from .cache import player_search_cache, club_search_cache, player_profile_cache, player_transfers_cache, leagues_search_cache
+from .cache import player_search_cache, club_search_cache, player_profile_cache, player_transfers_cache, leagues_search_cache
 
 from datetime import datetime
 
@@ -925,6 +925,9 @@ async def scrape_transfers():
             return transfers
     
 async def scrape_transfermarkt_leagues(search_query: str):
+    if search_query in leagues_search_cache:
+        return search_query[leagues_search_cache]
+    
     url = f"https://www.transfermarkt.co.uk/schnellsuche/ergebnis/schnellsuche?query={search_query.replace(' ', '+')}"
     
     try:
@@ -956,6 +959,7 @@ async def scrape_transfermarkt_leagues(search_query: str):
                                     'continent': cols[7].get_text(strip=True)
                                 })
                         break  # Found the leagues table, no need to check others
+                leagues_search_cache[search_query] = leagues
                 return leagues
                 
     except Exception as e:
