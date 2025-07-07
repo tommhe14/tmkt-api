@@ -2,7 +2,7 @@ import aiohttp
 from bs4 import BeautifulSoup
 import re
 import traceback
-from .cache import player_search_cache, club_search_cache, player_profile_cache, player_transfers_cache, leagues_search_cache
+#from .cache import player_search_cache, club_search_cache, player_profile_cache, player_transfers_cache, leagues_search_cache
 
 from datetime import datetime
 
@@ -925,37 +925,41 @@ async def scrape_transfers():
             return transfers
     
 async def scrape_transfermarkt_leagues(search_query: str):
-    if search_query in leagues_search_cache:
-        return leagues_search_cache[leagues_search_cache]
-    
     url = f"https://www.transfermarkt.co.uk/schnellsuche/ergebnis/schnellsuche?query={search_query.replace(' ', '+')}"
     
     try:
-        async with aiohttp.ClientSession(headers=headers) as session:
+        async with aiohttp.ClientSession(headers={
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36"
+        }) as session:
             async with session.get(url) as response:
                 response.raise_for_status()
                 html = await response.text()
                 
                 soup = BeautifulSoup(html, 'html.parser')
-                table = soup.find('table', class_='items')
-                if not table:
-                    return []
-                
                 leagues = []
-                for row in table.find_all('tr', class_=['odd', 'even']):
-                    cols = row.find_all('td')
-                    leagues.append({
-                        'name': cols[1].find('a')['title'],
-                        'country': cols[2].find('img')['title'],
-                        'clubs': cols[3].get_text(strip=True),
-                        'players': cols[4].get_text(strip=True),
-                        'total_value': cols[5].get_text(strip=True),
-                        'mean_value': cols[6].get_text(strip=True),
-                        'continent': cols[7].get_text(strip=True)
-                    })
-                leagues_search_cache[search_query] = leagues
+                
+                # Find all tables with class 'items'
+                for table in soup.find_all('table', class_='items'):
+                    # Check if this is the leagues table by looking at column headers
+                    headers = [th.get_text(strip=True) for th in table.find_all('th')]
+                    if 'Competition' in headers and 'Country' in headers:
+                        # This is the leagues table
+                        for row in table.find_all('tr', class_=['odd', 'even']):
+                            cols = row.find_all('td')
+                            if len(cols) >= 8:  # Ensure we have all columns
+                                leagues.append({
+                                    'name': cols[1].find('a')['title'] if cols[1].find('a') else None,
+                                    'country': cols[2].find('img')['title'] if cols[2].find('img') else None,
+                                    'clubs': cols[3].get_text(strip=True),
+                                    'players': cols[4].get_text(strip=True),
+                                    'total_value': cols[5].get_text(strip=True),
+                                    'continent': cols[7].get_text(strip=True)
+                                })
+                        break  # Found the leagues table, no need to check others
                 return leagues
                 
     except Exception as e:
-        print(f"Error scraping {search_query}: {e}")
+        print(f"Error scraping leagues: {e}")
         return []
+    
+#asyncio.run(scrape_transfermarkt_leagues("premier league"))
