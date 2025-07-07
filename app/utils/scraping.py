@@ -2,7 +2,7 @@ import aiohttp
 from bs4 import BeautifulSoup
 import re
 import traceback
-from .cache import player_search_cache, club_search_cache, player_profile_cache, player_transfers_cache
+from .cache import player_search_cache, club_search_cache, player_profile_cache, player_transfers_cache, leagues_search_cache
 
 from datetime import datetime
 
@@ -439,7 +439,7 @@ async def get_player_transfers(player_id: str):
         async with aiohttp.ClientSession(headers=headers) as session:
             async with session.get(api_url) as response:
                 if response.status != 200:
-                    raise Exception(f"API request failed with status {response.status}")
+                    return []
                 transfer_data = await response.json()
                 
                 if not transfer_data.get('success'):
@@ -510,9 +510,6 @@ async def scrape_club_profile(club_id: str):
         Dictionary containing all extracted club data
     """
     url = f"https://www.transfermarkt.co.uk/-/startseite/verein/{club_id}"
-    headers = {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36"
-    }
     
     try:
         async with aiohttp.ClientSession(headers=headers) as session:
@@ -927,3 +924,38 @@ async def scrape_transfers():
 
             return transfers
     
+async def scrape_transfermarkt_leagues(search_query: str):
+    if search_query in leagues_search_cache:
+        return leagues_search_cache[leagues_search_cache]
+    
+    url = f"https://www.transfermarkt.co.uk/schnellsuche/ergebnis/schnellsuche?query={search_query.replace(' ', '+')}"
+    
+    try:
+        async with aiohttp.ClientSession(headers=headers) as session:
+            async with session.get(url) as response:
+                response.raise_for_status()
+                html = await response.text()
+                
+                soup = BeautifulSoup(html, 'html.parser')
+                table = soup.find('table', class_='items')
+                if not table:
+                    return []
+                
+                leagues = []
+                for row in table.find_all('tr', class_=['odd', 'even']):
+                    cols = row.find_all('td')
+                    leagues.append({
+                        'name': cols[1].find('a')['title'],
+                        'country': cols[2].find('img')['title'],
+                        'clubs': cols[3].get_text(strip=True),
+                        'players': cols[4].get_text(strip=True),
+                        'total_value': cols[5].get_text(strip=True),
+                        'mean_value': cols[6].get_text(strip=True),
+                        'continent': cols[7].get_text(strip=True)
+                    })
+                leagues_search_cache[search_query] = leagues
+                return leagues
+                
+    except Exception as e:
+        print(f"Error scraping {search_query}: {e}")
+        return []
