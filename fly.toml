@@ -1,8 +1,0 @@
-app = "tmkt-api"
-
-[build]
-  dockerfile = "Dockerfile"
-
-[http_service]
-  internal_port = 8000
-  force_https = true
