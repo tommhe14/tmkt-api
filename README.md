@@ -10,8 +10,8 @@ The API is available at:
 ## Documentation
 
 Interactive API documentation (Swagger UI) is available at:  
-[https://tmkt-api-production.up.railway.app/docs](https://tmkt-api-production.up.railway.app/)  
-[https://tmkt-api-production.up.railway.app/redoc](https://tmkt-api-production.up.railway.app/redoc) (alternative docs)
+[TMKT API DOCS](https://tmkt-api-production.up.railway.app/)  
+[TMKT API REDOC](https://tmkt-api-production.up.railway.app/redoc) (alternative docs)
 
 
 ## Usage Example
