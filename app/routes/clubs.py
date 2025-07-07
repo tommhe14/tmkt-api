@@ -1,14 +1,15 @@
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Request
 
 from ..utils.scraping import fetch_transfermarkt_clubs, scrape_club_profile, scrape_club_squad, scrape_transfers
 from ..utils.cache import club_search_cache, club_profile_cache, club_squad_cache, club_transfers_cache
+from ..utils.rate_limiter import rate_limiter
 
 from datetime import datetime
 
 router = APIRouter()
 
 @router.get("/search")
-async def search_clubs(query: str):
+async def search_clubs(request: Request, query: str):
     """
     Search for clubs on Transfermarkt
     
@@ -18,6 +19,14 @@ async def search_clubs(query: str):
     Returns:
     - List of clubs with id, name, and market value
     """
+    client_ip = request.client.host
+    
+    await rate_limiter.check_rate_limit(
+        key=f"search_clubs:{client_ip}", 
+        limit=5, 
+        window=60 
+    )
+
     if not query or len(query) < 2:
         raise HTTPException(status_code=400, detail="Query must be at least 2 characters long")
     
@@ -33,8 +42,17 @@ async def search_clubs(query: str):
     
 @router.get("/{club_id}")
 async def get_club_profile(
+    request: Request,
     club_id: str
 ):
+    client_ip = request.client.host
+    
+    await rate_limiter.check_rate_limit(
+        key=f"club_profile:{client_ip}", 
+        limit=5, 
+        window=60 
+    )
+
     try:
         data = await scrape_club_profile(club_id)
         return {"query": club_id, "data": data, "cache_hit": club_id in club_profile_cache}
@@ -45,7 +63,7 @@ async def get_club_profile(
         )
     
 @router.get("/{club_id}/squad")
-async def get_club_squad(club_id: int):
+async def get_club_squad(request: Request, club_id: int):
     """
     Get detailed squad information for a club from Transfermarkt
     
@@ -55,6 +73,14 @@ async def get_club_squad(club_id: int):
     Returns:
     - List of players with their details
     """
+    client_ip = request.client.host
+    
+    await rate_limiter.check_rate_limit(
+        key=f"club_squad:{client_ip}", 
+        limit=5, 
+        window=60 
+    )
+
     try:
         squad_data = await scrape_club_squad(str(club_id))
         return {
@@ -67,9 +93,18 @@ async def get_club_squad(club_id: int):
     
 @router.get("/{team_id}/transfers")
 async def get_team_transfers(
+    request: Request,
     team_id: int,
     season: int
 ):
+    client_ip = request.client.host
+    
+    await rate_limiter.check_rate_limit(
+        key=f"club_transfers:{client_ip}", 
+        limit=5, 
+        window=60 
+    )
+
     """
     Get transfer history for a team by ID and season
     
@@ -81,9 +116,6 @@ async def get_team_transfers(
     - List of transfers with player details
     """
     try:
-        # Set cache headers
-        
-        # Call scraping function with team_id and season
         transfers = await scrape_transfers(team_id, season)
         
         return {

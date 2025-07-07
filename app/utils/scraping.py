@@ -8,7 +8,7 @@ from datetime import datetime
 
 import traceback
 
-from .cache import player_search_cache, club_search_cache, player_profile_cache, player_transfers_cache, leagues_search_cache, player_injuries_cache, player_stats_cache, club_profile_cache, club_squad_cache, club_transfers_cache, staff_search_cache, staff_profile_cache
+from .cache import player_search_cache, club_search_cache, player_profile_cache, player_transfers_cache, leagues_search_cache, player_injuries_cache, player_stats_cache, club_profile_cache, club_squad_cache, club_transfers_cache, staff_search_cache, staff_profile_cache, leagues_top_scorers_cache
 
 BASE_URL = "https://www.transfermarkt.co.uk"
 
@@ -1205,3 +1205,84 @@ async def get_staff_profile_scraping(staff_id: str):
         print(f"Error fetching staff profile {staff_id}: {e}")
         return None
 
+async def get_league_top_scorers(league_code: str, season: str):
+    """
+    Get top scorers for a specific league and season
+    
+    Args:
+        league_code: League code (e.g. 'GB1' for Premier League)
+        season: Season year (e.g. '2024')
+    
+    Returns:
+        List of dictionaries containing top scorer data
+    """
+    if (league_code, season) in leagues_top_scorers_cache:
+        return leagues_top_scorers_cache[(league_code, season)]
+    
+    url = f"{BASE_URL}/-/torschuetzenliste/wettbewerb/{league_code}/plus/?saison_id={season}"
+    
+    try:
+        async with aiohttp.ClientSession(headers=headers) as session:
+            async with session.get(url) as response:
+                response.raise_for_status()
+                html = await response.text()
+                soup = BeautifulSoup(html, 'html.parser')
+                
+                scorers = []
+                table = soup.find('table', {'class': 'items'})
+                
+                if not table:
+                    return []
+                
+                for row in table.find_all('tr', class_=['odd', 'even']):
+                    cols = row.find_all('td')
+                    if len(cols) < 7:
+                        continue
+                    
+                    player_table = cols[1].find('table', class_='inline-table')
+                    if not player_table:
+                        continue
+                        
+                    player_link = player_table.find('a', href=True, title=True)
+                    player_name = player_link.get('title') if player_link else None
+                    player_url = urljoin(BASE_URL, player_link['href']) if player_link else None
+                    
+                    position = player_table.find_all('tr')[1].get_text(strip=True) if len(player_table.find_all('tr')) > 1 else None
+
+                    nationality = []
+                    flags = cols[2].find_all('img', class_='flaggenrahmen')
+                    for flag in flags:
+                        nationality.append(flag['title'])
+                    
+                    age = cols[3].get_text(strip=True)
+                    
+                    club_link = cols[4].find('a')
+                    club = club_link.get('title') if club_link else None
+                    club_logo = club_link.find('img')['src'] if club_link and club_link.find('img') else None
+                    
+                    appearances = cols[5].get_text(strip=True)
+                    goals = cols[6].get_text(strip=True)
+                    
+                    photo_img = player_table.find('img', class_='bilderrahmen-fixed')
+                    photo_url = photo_img['data-src'] if photo_img and 'data-src' in photo_img.attrs else photo_img['src'] if photo_img else None
+                    
+                    scorers.append({
+                        'rank': cols[0].get_text(strip=True),
+                        'name': player_name,
+                        'position': position,
+                        'nationality': nationality,
+                        'age': age,
+                        'club': club,
+                        'club_logo': club_logo,
+                        'appearances': appearances,
+                        'goals': goals,
+                        'player_url': player_url,
+                        'photo_url': photo_url
+                    })
+                
+                leagues_top_scorers_cache[(league_code, season)] = scorers
+                return scorers
+                
+    except Exception as e:
+        print(f"Error fetching top scorers for {league_code} season {season}: {e}")
+        return []
