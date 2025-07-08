@@ -1,7 +1,7 @@
 from fastapi import APIRouter, HTTPException, Request
 
-from ..utils.cache import leagues_search_cache, leagues_top_scorers_cache
-from ..utils.scraping import scrape_transfermarkt_leagues, get_league_top_scorers
+from ..utils.cache import leagues_search_cache, leagues_top_scorers_cache, leagues_clubs_cache, leagues_transfers_overview_cache, leagues_table_cache
+from ..utils.scraping import scrape_transfermarkt_leagues, get_league_top_scorers, get_league_clubs, get_league_transfers_overview, get_league_table
 from ..utils.rate_limiter import rate_limiter
 
 router = APIRouter()
@@ -50,6 +50,79 @@ async def get_top_scorers(
             "season": season,
             "results": top_scorers,
             "cache_hit": (league_code, season) in leagues_top_scorers_cache
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+    
+@router.get("/{league_code}/clubs")
+async def get_league_clubs(
+    request: Request,
+    league_code: str
+):
+    client_ip = request.client.host
+    
+    await rate_limiter.check_rate_limit(
+        key=f"search_clubs:{client_ip}", 
+        limit=5, 
+        window=60 
+    )
+
+    try:
+        league_clubs = await get_league_clubs(league_code)
+        return {
+            "query": league_code,
+            "results": league_clubs,
+            "cache_hit": league_code in leagues_clubs_cache
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+    
+@router.get("/{league_code}/transfers")
+async def get_league_transfers_overview(
+    request: Request,
+    league_code: str,
+    season: int
+):
+    client_ip = request.client.host
+    
+    await rate_limiter.check_rate_limit(
+        key=f"search_clubs:{client_ip}", 
+        limit=5, 
+        window=60 
+    )
+
+    try:
+        transfers = await get_league_transfers_overview(league_code)
+        return {
+            "query": league_code,
+            "season": season,
+            "results": transfers,
+            "cache_hit": (league_code, season) in leagues_transfers_overview_cache
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+    
+@router.get("/{league_code}/table")
+async def get_league_table(
+    request: Request,
+    league_code: str,
+    season: int
+):
+    client_ip = request.client.host
+    
+    await rate_limiter.check_rate_limit(
+        key=f"search_clubs:{client_ip}", 
+        limit=5, 
+        window=60 
+    )
+
+    try:
+        table = await get_league_table(league_code)
+        return {
+            "query": league_code,
+            "season": season,
+            "results": table,
+            "cache_hit": (league_code, season) in leagues_table_cache
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
