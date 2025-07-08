@@ -117,7 +117,7 @@ async def get_league_table(
     )
 
     try:
-        table = await get_league_table_request(league_code)
+        table = await get_league_table_request(league_code, season)
         return {
             "query": league_code,
             "season": season,
