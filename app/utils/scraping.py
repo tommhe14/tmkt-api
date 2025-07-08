@@ -1365,7 +1365,7 @@ async def get_league_clubs_request(league_code: str):
         print(f"Error fetching league overview for {league_code}: {e}")
         return []
 
-async def get_league_transfers_overview(league_code: str, season: int):
+async def get_league_transfers_overview_request(league_code: str, season: int):
     """
     Get transfer data for a specific league and season, grouped by team
     
@@ -1472,7 +1472,7 @@ async def get_league_transfers_overview(league_code: str, season: int):
         print(f"Error fetching transfers for {league_code} season {season}: {e}")
         return []
     
-async def get_league_table(league_code: str, season: str):
+async def get_league_table_request(league_code: str, season: str):
     """
     Get league table for a specific league and season
     
