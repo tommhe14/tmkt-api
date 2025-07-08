@@ -1297,7 +1297,7 @@ async def get_league_top_scorers(league_code: str, season: str):
         print(f"Error fetching top scorers for {league_code} season {season}: {e}")
         return []
     
-async def get_league_clubs(league_code: str):
+async def get_league_clubs_request(league_code: str):
     """
     Get league overview data including club statistics
     

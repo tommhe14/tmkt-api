@@ -1,7 +1,7 @@
 from fastapi import APIRouter, HTTPException, Request
 
 from ..utils.cache import leagues_search_cache, leagues_top_scorers_cache, leagues_clubs_cache, leagues_transfers_overview_cache, leagues_table_cache
-from ..utils.scraping import scrape_transfermarkt_leagues, get_league_top_scorers, get_league_clubs, get_league_transfers_overview, get_league_table
+from ..utils.scraping import scrape_transfermarkt_leagues, get_league_top_scorers, get_league_clubs_request, get_league_transfers_overview, get_league_table
 from ..utils.rate_limiter import rate_limiter
 
 router = APIRouter()
@@ -68,7 +68,7 @@ async def get_league_clubs(
     )
 
     try:
-        league_clubs = await get_league_clubs(league_code)
+        league_clubs = await get_league_clubs_request(league_code)
         return {
             "query": league_code,
             "results": league_clubs,
