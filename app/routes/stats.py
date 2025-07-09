@@ -7,7 +7,7 @@ from ..utils.rate_limiter import rate_limiter
 router = APIRouter()
 
 @router.get("/countries")
-async def get_countries(request: Request, query: str):
+async def get_countries(request: Request):
     client_ip = request.client.host
     
     await rate_limiter.check_rate_limit(
@@ -16,8 +16,8 @@ async def get_countries(request: Request, query: str):
         window=60 
     )
     try:
-        countries = await get_country_list(query)
-        return {"query": query, "results": countries, "cache_hit": query in country_list_cache}
+        countries = await get_country_list()
+        return {"query": "get_countries", "results": countries, "cache_hit": "country_list" in country_list_cache}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
     
