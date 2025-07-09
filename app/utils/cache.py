@@ -10,6 +10,7 @@ club_search_cache = TTLCache(maxsize=1000, ttl=3600)
 club_profile_cache = TTLCache(maxsize=1000, ttl=3600)
 club_squad_cache = TTLCache(maxsize=1000, ttl=3600)
 club_transfers_cache = TTLCache(maxsize=1000, ttl=3600)
+club_fixtures_cache = TTLCache(maxsize=1000, ttl=3600)
 
 leagues_search_cache = TTLCache(maxsize=1000, ttl=3600)
 leagues_top_scorers_cache = TTLCache(maxsize=1000, ttl=3600)

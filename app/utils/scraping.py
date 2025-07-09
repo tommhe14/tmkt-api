@@ -8,7 +8,7 @@ from datetime import datetime
 
 import traceback
 
-from .cache import player_search_cache, club_search_cache, player_profile_cache, player_transfers_cache, leagues_search_cache, player_injuries_cache, player_stats_cache, club_profile_cache, club_squad_cache, club_transfers_cache, staff_search_cache, staff_profile_cache, leagues_top_scorers_cache, leagues_clubs_cache, leagues_table_cache, player_injuries_cache, leagues_transfers_overview_cache
+from .cache import player_search_cache, club_search_cache, player_profile_cache, player_transfers_cache, leagues_search_cache, player_injuries_cache, player_stats_cache, club_profile_cache, club_squad_cache, club_transfers_cache, staff_search_cache, staff_profile_cache, leagues_top_scorers_cache, leagues_clubs_cache, leagues_table_cache, player_injuries_cache, leagues_transfers_overview_cache, club_fixtures_cache
 
 BASE_URL = "https://www.transfermarkt.co.uk"
 
@@ -1554,4 +1554,86 @@ async def get_league_table_request(league_code: str, season: str):
                 
     except Exception as e:
         print(f"Error fetching league table for {league_code} season {season}: {e}")
+        return []
+
+async def get_club_fixtures_request(club_id: str):
+    """
+    Get club fixtures from Transfermarkt with complete data extraction
+    
+    Args:
+        club_id: Club ID (e.g. '11' for Arsenal)
+    
+    Returns:
+        List of dictionaries containing all fixture data
+    """
+    if club_id in club_fixtures_cache:
+        return club_fixtures_cache[club_id]
+    
+    url = f"https://www.transfermarkt.co.uk/-/spielplandatum/verein/{club_id}"
+    
+    try:
+        async with aiohttp.ClientSession(headers=headers) as session:
+            async with session.get(url) as response:
+                response.raise_for_status()
+                html = await response.text()
+                soup = BeautifulSoup(html, 'html.parser')
+                
+                fixtures = []
+                
+                table_container = soup.find('div', {'class': 'responsive-table'})
+                if not table_container:
+                    print("No responsive-table container found")
+                    return []
+                
+                table = table_container.find('table')
+                if not table:
+                    print("No fixtures table found")
+                    return []
+                
+                for row in table.find_all('tr'):
+                    row_classes = row.get('class', [])
+                    if isinstance(row_classes, str):
+                        row_classes = row_classes.split()
+                    
+                    cols = row.find_all('td')
+                    if len(cols) < 10:
+                        continue
+                    
+                    try:
+                        matchday_elem = cols[0].find('a')
+                        matchday = cols[0].get_text(strip=True)
+                        matchday_url = urljoin(BASE_URL, matchday_elem.get('href')) if matchday_elem else None
+                        
+                        opponent_elem = cols[6].find('a')
+                        opponent_img = cols[5].find('img', {'class': 'tiny_wappen'})
+                        
+                        fixture = {
+                            'matchday': matchday,
+                            'matchday_url': matchday_url,
+                            'date': cols[1].get_text(strip=True),
+                            'time': cols[2].get_text(strip=True),
+                            'venue': cols[3].get_text(strip=True),
+                            'ranking': cols[4].get_text(strip=True),
+                            'opponent': {
+                                'club_id': opponent_elem.get('href').split('/')[-3] if opponent_elem else None,
+                                'name': cols[6].get_text(strip=True),
+                                'url': urljoin(BASE_URL, opponent_elem.get('href')) if opponent_elem else None,
+                                'logo': opponent_img.get('src') if opponent_img else None
+                            },
+                            'system_of_play': cols[7].get_text(strip=True),
+                            'attendance': cols[8].get_text(strip=True),
+                            'result': cols[9].get_text(strip=True),
+                            'result_url': urljoin(BASE_URL, cols[9].find('a').get('href')) if cols[9].find('a') else None
+                        }
+                        
+                        fixtures.append(fixture)
+                    except Exception as e:
+                        print(f"Error processing fixture row: {e}")
+                        continue
+
+                club_fixtures_cache[club_id] = fixtures
+                return fixtures
+                
+    except Exception as e:
+        print(f"Error fetching fixtures for club {club_id}: {e}")
         return []

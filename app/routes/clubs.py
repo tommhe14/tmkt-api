@@ -1,7 +1,7 @@
 from fastapi import APIRouter, HTTPException, Request
 
-from ..utils.scraping import fetch_transfermarkt_clubs, scrape_club_profile, scrape_club_squad, scrape_transfers
-from ..utils.cache import club_search_cache, club_profile_cache, club_squad_cache, club_transfers_cache
+from ..utils.scraping import fetch_transfermarkt_clubs, scrape_club_profile, scrape_club_squad, scrape_transfers, get_club_fixtures_request
+from ..utils.cache import club_search_cache, club_profile_cache, club_squad_cache, club_transfers_cache, club_fixtures_cache
 from ..utils.rate_limiter import rate_limiter
 
 from datetime import datetime
@@ -123,6 +123,30 @@ async def get_team_transfers(
             "season": season,
             "results": transfers,
             "cache_hit": (team_id, season) in club_transfers_cache
+        }
+        
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+    
+@router.get("/{team_id}/fixtures")
+async def get_team_fixtures(
+    request: Request,
+    team_id: int
+):
+    client_ip = request.client.host
+    
+    await rate_limiter.check_rate_limit(
+        key=f"club_transfers:{client_ip}", 
+        limit=5, 
+        window=60 
+    )
+
+    try:
+        fixtures = await club_fixtures_cache(team_id)
+        return {
+            "query": team_id,
+            "results": fixtures,
+            "cache_hit": team_id in club_fixtures_cache
         }
         
     except Exception as e:
