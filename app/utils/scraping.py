@@ -8,7 +8,7 @@ from datetime import datetime
 
 import traceback
 
-from .cache import player_search_cache, club_search_cache, player_profile_cache, player_transfers_cache, leagues_search_cache, player_injuries_cache, player_stats_cache, club_profile_cache, club_squad_cache, club_transfers_cache, staff_search_cache, staff_profile_cache, leagues_top_scorers_cache, leagues_clubs_cache, leagues_table_cache, player_injuries_cache, leagues_transfers_overview_cache, club_fixtures_cache
+from .cache import player_search_cache, club_search_cache, player_profile_cache, player_transfers_cache, leagues_search_cache, player_injuries_cache, player_stats_cache, club_profile_cache, club_squad_cache, club_transfers_cache, staff_search_cache, staff_profile_cache, leagues_top_scorers_cache, leagues_clubs_cache, leagues_table_cache, player_injuries_cache, leagues_transfers_overview_cache, club_fixtures_cache, country_list_cache, foreign_players_cache
 
 BASE_URL = "https://www.transfermarkt.co.uk"
 
@@ -1637,3 +1637,102 @@ async def get_club_fixtures_request(club_id: str):
     except Exception as e:
         print(f"Error fetching fixtures for club {club_id}: {e}")
         return []
+
+async def get_country_list():
+    """
+    Get list of countries and their IDs from Transfermarkt's foreigners statistics page
+    
+    Returns:
+        List of dictionaries containing country names and IDs
+    """
+    if "country_list" in country_list_cache:
+        return country_list_cache["country_list"]
+    
+    url = "https://www.transfermarkt.co.uk/land-statistik/legionaere/statistik/stat/"
+    
+    try:
+        async with aiohttp.ClientSession(headers=headers) as session:
+            async with session.get(url) as response:
+                response.raise_for_status()
+                html = await response.text()
+                soup = BeautifulSoup(html, 'html.parser')
+                
+                countries = []
+                
+                select = soup.find('select', {'name': 'land_id'})
+                if not select:
+                    print("No country select element found")
+                    return []
+                
+                for option in select.find_all('option'):
+                    country = {
+                        'id': option.get('value'),
+                        'name': option.get_text(strip=True)
+                    }
+                    countries.append(country)
+
+                country_list_cache["country_list"] = countries
+                return countries
+                
+    except Exception as e:
+        print(f"Error fetching country list: {e}")
+        return []
+    
+async def get_foreign_players_request(country_id: str):
+    """
+    Get list of countries and number of players from specified country playing abroad
+    
+    Args:
+        country_id: Country ID (e.g. '184' for United States)
+    
+    Returns:
+        List of dictionaries containing country data and player counts
+    """
+    if country_id in foreign_players_cache:
+        return foreign_players_cache[country_id]
+    
+    url = f"https://www.transfermarkt.co.uk/land-statistik/legionaere/statistik/stat/?land_id={country_id}"
+    
+    try:
+        async with aiohttp.ClientSession(headers=headers) as session:
+            async with session.get(url) as response:
+                response.raise_for_status()
+                html = await response.text()
+                soup = BeautifulSoup(html, 'html.parser')
+                
+                countries = []
+                
+                # Find the main table
+                table = soup.find('table', class_='items')
+                if not table:
+                    print("No data table found")
+                    return []
+                
+                # Process all rows in the table body
+                for row in table.find_all('tr', class_=['odd', 'even']):
+                    cols = row.find_all('td')
+                    if len(cols) < 5:  # Ensure we have all columns
+                        continue
+                    
+                    # Extract country data
+                    country_flag = cols[1].find('img', class_='flaggenrahmen')
+                    country_link = cols[2].find('a')
+                    player_count = cols[3].get_text(strip=True)
+                    total_value = cols[4].get_text(strip=True)
+                    
+                    countries.append({
+                        'rank': cols[0].get_text(strip=True),
+                        'country_id': country_link['href'].split('/')[-3] if country_link else None,
+                        'country_name': country_link.get_text(strip=True) if country_link else None,
+                        'flag_url': country_flag['src'] if country_flag else None,
+                        'player_count': player_count,
+                        'total_value': total_value
+                    })
+
+                foreign_players_cache[country_id] = countries
+                return countries
+                
+    except Exception as e:
+        print(f"Error fetching foreign players data for country {country_id}: {e}")
+        return []
+    

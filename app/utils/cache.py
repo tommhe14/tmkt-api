@@ -20,3 +20,6 @@ leagues_table_cache = TTLCache(maxsize=1000, ttl=3600)
 
 staff_search_cache =  TTLCache(maxsize=1000, ttl=3600)
 staff_profile_cache = TTLCache(maxsize=1000, ttl=3600)
+
+country_list_cache = TTLCache(maxsize=1000, ttl=3600)
+foreign_players_cache = TTLCache(maxsize=1000, ttl=3600)
