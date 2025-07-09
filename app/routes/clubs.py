@@ -142,7 +142,7 @@ async def get_team_fixtures(
     )
 
     try:
-        fixtures = await club_fixtures_cache(team_id)
+        fixtures = await get_club_fixtures_request(team_id)
         return {
             "query": team_id,
             "results": fixtures,
