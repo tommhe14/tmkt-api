@@ -699,7 +699,7 @@ async def scrape_club_squad(club_id: str):
         print(traceback.format_exc())
         raise Exception(f"Failed to scrape squad: {str(e)}")
 
-async def scrape_transfers(club_id: int, season: int):
+async def scrape_team_transfers(club_id: int, season: int):
     """Scrape transfers for a specific team and season"""
     if (club_id, season) in club_transfers_cache:
         return club_transfers_cache[(club_id, season)]

@@ -1,6 +1,6 @@
 from fastapi import APIRouter, HTTPException, Request
 
-from ..utils.scraping import fetch_transfermarkt_clubs, scrape_club_profile, scrape_club_squad, scrape_transfers, get_club_fixtures_request
+from ..utils.scraping import fetch_transfermarkt_clubs, scrape_club_profile, scrape_club_squad, scrape_team_transfers, get_club_fixtures_request
 from ..utils.cache import club_search_cache, club_profile_cache, club_squad_cache, club_transfers_cache, club_fixtures_cache
 from ..utils.rate_limiter import rate_limiter
 
@@ -116,7 +116,7 @@ async def get_team_transfers(
     - List of transfers with player details
     """
     try:
-        transfers = await scrape_transfers(team_id, season)
+        transfers = await scrape_team_transfers(team_id, season)
         
         return {
             "query": team_id,
