@@ -1364,113 +1364,6 @@ async def get_league_clubs_request(league_code: str):
     except Exception as e:
         print(f"Error fetching league overview for {league_code}: {e}")
         return []
-
-async def get_league_transfers_overview_request(league_code: str, season: int):
-    """
-    Get transfer data for a specific league and season, grouped by team
-    
-    Args:
-        league_code: League code (e.g. 'GB1' for Premier League)
-        season: Season year (e.g. '2025')
-    
-    Returns:
-        List of dictionaries containing team transfer data with:
-        - team_name: Name of the club
-        - team_logo: URL of club logo
-        - team_url: URL to club's transfer page
-        - transfers: List of transfers (both incoming and outgoing)
-    """
-    if (league_code, season) in leagues_transfers_overview_cache:
-        return leagues_transfers_overview_cache[(league_code, season)]
-    
-    url = f"{BASE_URL}/-/transfers/wettbewerb/{league_code}/plus/?saison_id={season}&leihe=1&intern=0&intern=1"
-    
-    try:
-        async with aiohttp.ClientSession(headers=headers) as session:
-            async with session.get(url) as response:
-                response.raise_for_status()
-                html = await response.text()
-                soup = BeautifulSoup(html, 'html.parser')
-                
-                teams_data = []
-                team_boxes = soup.find_all('div', class_='box')
-                
-                for box in team_boxes:
-                    team_header = box.find('h2', class_='content-box-headline')
-                    if not team_header:
-                        continue
-                        
-                    team_link = team_header.find('a')
-
-                    if not team_link:
-                        continue
-
-                    team_name = team_link.get('title').replace('Array', '').strip() if team_link else None
-                    team_url = urljoin(BASE_URL, team_link['href']) if team_link else None
-                    
-                    logo_img = team_header.find('img')
-                    team_logo = logo_img['src'] if logo_img else None
-                    
-                    transfers = []
-                    table = box.find('table')
-                    if table:
-                        for row in table.find_all('tr')[1:]: 
-                            cols = row.find_all('td')
-                            if len(cols) < 9:  
-                                continue
-
-                            player_link = cols[0].find('a')
-                            player_name = player_link.get('title') if player_link else None
-                            player_url = urljoin(BASE_URL, player_link['href']) if player_link else None
-                            
-                            age = cols[1].get_text(strip=True)
-                            
-                            nationality_img = cols[2].find('img')
-                            nationality = nationality_img['title'] if nationality_img else None
-                            
-                            position = cols[3].get_text(strip=True)
-                            short_position = cols[4].get_text(strip=True)
-                            market_value = cols[5].get_text(strip=True)
-                            
-                            prev_club_link = cols[7].find('a')
-                            prev_club = prev_club_link.get_text(strip=True) if prev_club_link else None
-                            prev_club_url = urljoin(BASE_URL, prev_club_link['href']) if prev_club_link else None
-                            
-                            prev_club_img = cols[6].find('img')
-                            prev_club_logo = prev_club_img['src'] if prev_club_img else None
-                            
-                            fee = cols[8].get_text(strip=False)
-                            
-                            transfers.append({
-                                'player_id':player_url.split("/")[-1] if player_url else None,
-                                'player_name': player_name,
-                                'player_url': player_url,
-                                'age': age,
-                                'nationality': nationality,
-                                'position': position,
-                                'short_position': short_position,
-                                'market_value': market_value,
-                                'previous_club': prev_club,
-                                'previous_club_logo': prev_club_logo,
-                                'previous_club_url': prev_club_url,
-                                'fee': fee,
-                                'transfer_type': 'in'  
-                            })
-                    
-                    teams_data.append({
-                        'team_id': team_url.split("/")[-3] if team_url else None,
-                        'team_name': team_name,
-                        'team_logo': team_logo,
-                        'team_url': team_url,
-                        'transfers': transfers
-                    })
-
-                leagues_transfers_overview_cache[(league_code, season)] = teams_data
-                return teams_data
-                
-    except Exception as e:
-        print(f"Error fetching transfers for {league_code} season {season}: {e}")
-        return []
     
 async def get_league_table_request(league_code: str, season: str):
     """
@@ -1736,3 +1629,150 @@ async def get_foreign_players_request(country_id: str):
         print(f"Error fetching foreign players data for country {country_id}: {e}")
         return []
     
+async def get_league_transfers_overview_request(league_code: str, season: int):
+    """
+    Get complete transfer data for a specific league and season, grouped by team
+    with both incoming and outgoing transfers
+    
+    Args:
+        league_code: League code (e.g. 'GB1' for Premier League)
+        season: Season year (e.g. '2025')
+    
+    Returns:
+        List of dictionaries containing team transfer data with:
+        - team_name: Name of the club
+        - team_logo: URL of club logo
+        - team_url: URL to club's transfer page
+        - transfers_in: List of incoming transfers
+        - transfers_out: List of outgoing transfers
+        - transfer_stats: Dictionary with transfer statistics
+    """
+    if (league_code, season) in leagues_transfers_overview_cache:
+        return leagues_transfers_overview_cache[(league_code, season)]
+    
+    url = f"{BASE_URL}/-/transfers/wettbewerb/{league_code}/plus/?saison_id={season}&leihe=1&intern=0&intern=1"
+    
+    try:
+        async with aiohttp.ClientSession(headers=headers) as session:
+            async with session.get(url) as response:
+                response.raise_for_status()
+                html = await response.text()
+                soup = BeautifulSoup(html, 'html.parser')
+                
+                teams_data = []
+                team_boxes = soup.find_all('div', class_='box')
+                
+                for box in team_boxes:
+                    team_header = box.find('h2', class_='content-box-headline')
+                    if not team_header:
+                        continue
+                        
+                    team_link = team_header.find('a')
+                    if not team_link:
+                        continue
+
+                    team_name = team_link.get('title', '').replace('Array', '').strip()
+                    team_url = urljoin(BASE_URL, team_link['href']) if team_link else None
+                    team_id = team_url.split('/')[-3] if team_url else None
+                    
+                    logo_img = team_header.find('img')
+                    team_logo = logo_img['src'] if logo_img else None
+                    
+                    stats_box = box.find('div', class_='transfer-zusatzinfo-box')
+                    transfer_stats = {
+                        'avg_age': None,
+                        'total_market_value': None,
+                        'expenditure': None,
+                        'income': None
+                    }
+                    if stats_box:
+                        age_span = stats_box.find('span', class_='transfer-zusatzinfo-alter')
+                        if age_span:
+                            transfer_stats['avg_age'] = age_span.get_text(strip=True).replace('Average age of arrivals:', '').strip()
+                        
+                        value_span = stats_box.find('span', class_='transfer-zusatzinfo-wert')
+                        if value_span:
+                            transfer_stats['total_market_value'] = value_span.get_text(strip=True).replace('Total market value of arrivals:', '').strip()
+                        
+                        expenditure_span = stats_box.find('span', class_='transfer-einnahmen-ausgaben')
+                        if expenditure_span:
+                            text = expenditure_span.get_text(strip=True)
+                            if 'Expenditure:' in text:
+                                transfer_stats['expenditure'] = text.replace('Expenditure:', '').strip()
+                            elif 'Income:' in text:
+                                transfer_stats['income'] = text.replace('Income:', '').strip()
+                    
+                    transfers_in = []
+                    transfers_out = []
+                    
+                    tables = box.find_all('table')
+                    
+                    if len(tables) > 0:
+                        for row in tables[0].find_all('tr')[1:]:  
+                            cols = row.find_all('td')
+                            if len(cols) < 9:
+                                continue
+                            
+                            transfer = extract_transfer_data_tr(cols)
+                            transfer['transfer_type'] = 'in'
+                            transfers_in.append(transfer)
+                    
+                    if len(tables) > 1:
+                        for row in tables[1].find_all('tr')[1:]:  
+                            cols = row.find_all('td')
+                            if len(cols) < 9:
+                                continue
+                            
+                            transfer = extract_transfer_data_tr(cols)
+                            transfer['transfer_type'] = 'out'
+                            transfers_out.append(transfer)
+                    
+                    teams_data.append({
+                        'team_id': team_id,
+                        'team_name': team_name,
+                        'team_logo': team_logo,
+                        'team_url': team_url,
+                        'transfers_in': transfers_in,
+                        'transfers_out': transfers_out,
+                        'transfer_stats': transfer_stats
+                    })
+
+                leagues_transfers_overview_cache[(league_code, season)] = teams_data
+                return teams_data
+                
+    except Exception as e:
+        print(f"Error fetching transfers for {league_code} season {season}: {e}")
+        return []
+
+def extract_transfer_data_tr(cols):
+    """Helper function to extract transfer data from table columns"""
+    player_link = cols[0].find('a')
+    player_name = player_link.get('title', '').strip() if player_link else ''
+    player_url = urljoin(BASE_URL, player_link['href']) if player_link else None
+    
+    nationality_imgs = cols[2].find_all('img', class_='flaggenrahmen')
+    nationalities = [img['title'] for img in nationality_imgs if img.get('title')]
+    
+    if len(cols) > 7:
+        club_link = cols[7].find('a')
+        club_name = club_link.get_text(strip=True) if club_link else ''
+        club_url = urljoin(BASE_URL, club_link['href']) if club_link else None
+        club_img = cols[6].find('img', class_='tiny_wappen')
+        club_logo = club_img['src'] if club_img else None
+    else:
+        club_name = club_url = club_logo = None
+    
+    return {
+        'player_id': player_url.split('/')[-1] if player_url else None,
+        'player_name': player_name,
+        'player_url': player_url,
+        'age': cols[1].get_text(strip=True) if len(cols) > 1 else '',
+        'nationalities': nationalities,
+        'position': cols[3].get_text(strip=True) if len(cols) > 3 else '',
+        'short_position': cols[4].get_text(strip=True) if len(cols) > 4 else '',
+        'market_value': cols[5].get_text(strip=True) if len(cols) > 5 else '',
+        'club_name': club_name,
+        'club_url': club_url,
+        'club_logo': club_logo,
+        'fee': cols[8].get_text(strip=True) if len(cols) > 8 else ''
+    }
