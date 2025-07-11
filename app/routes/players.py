@@ -1,6 +1,6 @@
 from fastapi import APIRouter, HTTPException, Request
 
-from ..utils.scraping import fetch_transfermarkt_players, scrape_player_profile, scrape_player_stats, get_player_transfers, fetch_player_injuries
+from ..utils.scraping import fetch_transfermarkt_players, scrape_player_profile, scrape_player_stats, get_player_transfers_request, fetch_player_injuries
 from ..utils.cache import player_search_cache, player_profile_cache, player_injuries_cache, player_stats_cache, player_transfers_cache
 from ..utils.rate_limiter import rate_limiter
 
@@ -113,7 +113,7 @@ async def get_player_transfers(
     )
 
     try:
-        data = await get_player_transfers(player_id)
+        data = await get_player_transfers_request(player_id)
         return {"query": player_id, "results": data, "cache_hit": player_id in player_transfers_cache}
     except Exception as e:
         raise HTTPException(

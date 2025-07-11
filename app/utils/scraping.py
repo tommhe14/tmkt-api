@@ -415,7 +415,7 @@ async def get_team_name(team_id: str) -> str:
     except Exception as e:
         raise Exception(f"Failed to fetch team name: {str(e)}")
     
-async def get_player_transfers(player_id: str):
+async def get_player_transfers_request(player_id: str):
     """
     Fetches a player's transfer history from Transfermarkt API and enriches with team names.
     
