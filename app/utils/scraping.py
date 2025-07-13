@@ -185,7 +185,6 @@ async def scrape_player_profile(player_id: str):
                 name_text = name_text.replace(shirt_number, '')
             full_name = re.sub(r'\s+', ' ', name_text).strip()
 
-        is_retired = 'Retired' in html or 'Former International' in html
         is_deceased = bool(header.find('div', class_='dataRibbonRIP'))
 
         club_link = header.find('span', class_='data-header__club').find('a') if header.find('span', class_='data-header__club') else None
@@ -257,6 +256,9 @@ async def scrape_player_profile(player_id: str):
         height_element = header.select_one('li:-soup-contains("Height:") span[itemprop="height"]')
         height = height_element.get_text(strip=True) if height_element else None
 
+        club_name = header.find('span', class_='data-header__club').get_text(strip=True) if header.find('span', class_='data-header__club') else None
+        is_retired = True if club_name and club_name.lower() == "retired" else None
+
         agent_link = header.find('a', href=lambda x: x and 'beraterfirma' in x)
         agent_info = {
             "name": agent_link.get_text(strip=True).replace(".", "").strip() if agent_link else None,
@@ -277,9 +279,9 @@ async def scrape_player_profile(player_id: str):
         result = {
             "id": int(player_id),
             "name": full_name,
-            "shirt_number": shirt_number.replace("#", ""),
+            "shirt_number": shirt_number.replace("#", "") if shirt_number else None,
             "club": {
-                "name": header.find('span', class_='data-header__club').get_text(strip=True) if header.find('span', class_='data-header__club') else None,
+                "name": club_name,
                 "id": club_id,
                 "logo": club_logo,
                 "league": header.find('span', class_='data-header__league').get_text(strip=True) if header.find('span', class_='data-header__league') else None
@@ -302,7 +304,6 @@ async def scrape_player_profile(player_id: str):
         }
 
         player_profile_cache[player_id] = {"result": result}
-
         return {"result": result}
 
     except Exception as e:
