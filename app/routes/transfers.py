@@ -10,7 +10,7 @@ async def get_transfers(request: Request):
     client_ip = request.client.host
     
     await rate_limiter.check_rate_limit(
-        key=f"search_clubs:{client_ip}", 
+        key=f"transfers:{client_ip}", 
         limit=5, 
         window=60 
     )
