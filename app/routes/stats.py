@@ -11,7 +11,7 @@ async def get_countries(request: Request):
     client_ip = request.client.host
     
     await rate_limiter.check_rate_limit(
-        key=f"search_clubs:{client_ip}", 
+        key=f"countries:{client_ip}", 
         limit=5, 
         window=60 
     )
@@ -29,7 +29,7 @@ async def get_current_foreign_players(request: Request, country_id: int):
     client_ip = request.client.host
     
     await rate_limiter.check_rate_limit(
-        key=f"search_clubs:{client_ip}", 
+        key=f"foreign_players:{client_ip}", 
         limit=5, 
         window=60 
     )
