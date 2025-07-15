@@ -11,7 +11,7 @@ async def search_staff(request: Request, query: str):
     client_ip = request.client.host
     
     await rate_limiter.check_rate_limit(
-        key=f"search_clubs:{client_ip}", 
+        key=f"search_staff:{client_ip}", 
         limit=5, 
         window=60 
     )
@@ -26,7 +26,7 @@ async def get_staff_profile(request: Request, staff_id: str):
     client_ip = request.client.host
     
     await rate_limiter.check_rate_limit(
-        key=f"search_clubs:{client_ip}", 
+        key=f"staff_profile:{client_ip}", 
         limit=5, 
         window=60 
     )
