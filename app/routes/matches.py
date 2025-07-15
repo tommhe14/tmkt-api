@@ -12,7 +12,7 @@ async def get_todays_matches(request: Request):
     client_ip = request.client.host
     
     await rate_limiter.check_rate_limit(
-        key=f"search_clubs:{client_ip}", 
+        key=f"get_todays:{client_ip}", 
         limit=5, 
         window=60 
     )
@@ -34,7 +34,7 @@ async def get_matches_by_date(request: Request, date: str):
     client_ip = request.client.host
     
     await rate_limiter.check_rate_limit(
-        key=f"search_clubs:{client_ip}", 
+        key=f"matches_date:{client_ip}", 
         limit=5, 
         window=60 
     )
