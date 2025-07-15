@@ -11,7 +11,7 @@ async def search_leagues(request: Request, query: str):
     client_ip = request.client.host
     
     await rate_limiter.check_rate_limit(
-        key=f"search_clubs:{client_ip}", 
+        key=f"search_leagues:{client_ip}", 
         limit=5, 
         window=60 
     )
@@ -38,7 +38,7 @@ async def get_top_scorers(
     client_ip = request.client.host
     
     await rate_limiter.check_rate_limit(
-        key=f"search_clubs:{client_ip}", 
+        key=f"league_scorers:{client_ip}", 
         limit=5, 
         window=60 
     )
@@ -62,7 +62,7 @@ async def get_league_clubs(
     client_ip = request.client.host
     
     await rate_limiter.check_rate_limit(
-        key=f"search_clubs:{client_ip}", 
+        key=f"league_clubs:{client_ip}", 
         limit=5, 
         window=60 
     )
@@ -86,7 +86,7 @@ async def get_league_transfers_overview(
     client_ip = request.client.host
     
     await rate_limiter.check_rate_limit(
-        key=f"search_clubs:{client_ip}", 
+        key=f"league_transfers:{client_ip}", 
         limit=5, 
         window=60 
     )
@@ -111,7 +111,7 @@ async def get_league_table(
     client_ip = request.client.host
     
     await rate_limiter.check_rate_limit(
-        key=f"search_clubs:{client_ip}", 
+        key=f"league_table:{client_ip}", 
         limit=5, 
         window=60 
     )
