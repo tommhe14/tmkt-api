@@ -7,9 +7,8 @@ from urllib.parse import urljoin
 from datetime import datetime
 
 import traceback
-import asyncio
-import json
-#from .cache import player_search_cache, club_search_cache, player_profile_cache, player_transfers_cache, leagues_search_cache, player_injuries_cache, player_stats_cache, club_profile_cache, club_squad_cache, club_transfers_cache, staff_search_cache, staff_profile_cache, leagues_top_scorers_cache, leagues_clubs_cache, leagues_table_cache, player_injuries_cache, leagues_transfers_overview_cache, club_fixtures_cache, country_list_cache, foreign_players_cache
+
+from .cache import player_search_cache, club_search_cache, player_profile_cache, player_transfers_cache, leagues_search_cache, player_injuries_cache, player_stats_cache, club_profile_cache, club_squad_cache, club_transfers_cache, staff_search_cache, staff_profile_cache, leagues_top_scorers_cache, leagues_clubs_cache, leagues_table_cache, player_injuries_cache, leagues_transfers_overview_cache, club_fixtures_cache, country_list_cache, foreign_players_cache
 
 BASE_URL = "https://www.transfermarkt.co.uk"
 
