@@ -7,8 +7,9 @@ from urllib.parse import urljoin
 from datetime import datetime
 
 import traceback
-
-from .cache import player_search_cache, club_search_cache, player_profile_cache, player_transfers_cache, leagues_search_cache, player_injuries_cache, player_stats_cache, club_profile_cache, club_squad_cache, club_transfers_cache, staff_search_cache, staff_profile_cache, leagues_top_scorers_cache, leagues_clubs_cache, leagues_table_cache, player_injuries_cache, leagues_transfers_overview_cache, club_fixtures_cache, country_list_cache, foreign_players_cache
+import asyncio
+import json
+#from .cache import player_search_cache, club_search_cache, player_profile_cache, player_transfers_cache, leagues_search_cache, player_injuries_cache, player_stats_cache, club_profile_cache, club_squad_cache, club_transfers_cache, staff_search_cache, staff_profile_cache, leagues_top_scorers_cache, leagues_clubs_cache, leagues_table_cache, player_injuries_cache, leagues_transfers_overview_cache, club_fixtures_cache, country_list_cache, foreign_players_cache
 
 BASE_URL = "https://www.transfermarkt.co.uk"
 
@@ -1777,3 +1778,65 @@ def extract_transfer_data_tr(cols):
         'club_logo': club_logo,
         'fee': cols[8].get_text(strip=True) if len(cols) > 8 else ''
     }
+
+async def fetch_player_absences(player_id: int):
+    """
+    Fetches player absences (injuries/suspensions) from Transfermarkt
+    Returns a list of dictionaries containing absence details
+    """
+    url = f"https://www.transfermarkt.co.uk/-/ausfaelle/spieler/{player_id}"
+    
+    absences = []
+    
+    async with aiohttp.ClientSession(headers=headers) as session:
+        try:
+            async with session.get(url) as response:
+                if response.status != 200:
+                    return []
+                
+                html = await response.text()
+                soup = BeautifulSoup(html, 'html.parser')
+                
+                table = soup.find('table', {'class': 'items'})
+                if not table:
+                    return []
+                
+                rows = table.find_all('tr')[1:]  
+                
+                for row in rows:
+                    cells = row.find_all('td')
+                    if len(cells) < 7:  
+                        continue
+                    
+                    competition_img = cells[2].find('img')
+
+                    competition = {
+                        'code': competition_img.get('src').split('/')[-1].split('?')[0].replace('.png', '').upper() if competition_img else None,
+                        'name': competition_img.get('title') if competition_img else None,
+                        'logo': competition_img.get('src') if competition_img else None
+                    }
+                    
+                    club_img = cells[6].find('img')
+                    club = {
+                        'id': club_img.get('src').split('/')[-1].split('?')[0].replace('.png', '').upper() if club_img else None,
+                        'name': club_img.get('title') if club_img else None,
+                        'logo': club_img.get('src') if club_img else None
+                    }
+                    
+                    absence = {
+                        'season': cells[0].get_text(strip=True),
+                        'reason': cells[1].get_text(strip=True),
+                        'competition': competition,
+                        'from_date': cells[3].get_text(strip=True),
+                        'until_date': cells[4].get_text(strip=True),
+                        'duration': cells[5].get_text(strip=True),
+                        'games_missed': cells[6].get_text(strip=True).split()[0],  # Get just the number
+                        'club': club
+                    }
+                    absences.append(absence)
+
+                return absences
+                
+        except Exception as e:
+            print(f"Error fetching absences for player {player_id}: {e}")
+            return []
