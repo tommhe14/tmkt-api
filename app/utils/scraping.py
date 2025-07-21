@@ -1841,5 +1841,3 @@ async def fetch_player_absences(player_id: int):
         except Exception as e:
             print(f"Error fetching absences for player {player_id}: {e}")
             return []
-        
-asyncio.run(get_player_transfers_request(495666))
