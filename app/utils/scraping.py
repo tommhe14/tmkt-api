@@ -8,7 +8,7 @@ from datetime import datetime
 
 import traceback
 
-from .cache import player_search_cache, club_search_cache, player_profile_cache, player_transfers_cache, leagues_search_cache, player_injuries_cache, player_stats_cache, club_profile_cache, club_squad_cache, club_transfers_cache, staff_search_cache, staff_profile_cache, leagues_top_scorers_cache, leagues_clubs_cache, leagues_table_cache, player_injuries_cache, leagues_transfers_overview_cache, club_fixtures_cache, country_list_cache, foreign_players_cache
+from .cache import player_search_cache, club_search_cache, player_profile_cache, player_transfers_cache, leagues_search_cache, player_injuries_cache, player_stats_cache, club_profile_cache, club_squad_cache, club_transfers_cache, staff_search_cache, staff_profile_cache, leagues_top_scorers_cache, leagues_clubs_cache, leagues_table_cache, player_injuries_cache, leagues_transfers_overview_cache, club_fixtures_cache, country_list_cache, foreign_players_cache, player_absences_cache
 
 BASE_URL = "https://www.transfermarkt.co.uk"
 
@@ -307,7 +307,7 @@ async def scrape_player_profile(player_id: str):
         return {"result": result}
 
     except Exception as e:
-        print(f"Error scraping player {player_id}: {str(e)}")
+        raise Exception(f"Error scraping player {player_id}: {str(e)}")
         raise
 
 async def scrape_player_stats(player_id: str, season: str = None):    
@@ -456,7 +456,7 @@ async def get_player_transfers_request(player_id: str):
                         "season": transfer['details']['season']['display'],
                         "age": transfer['details']['age'],
                         "market_value": transfer['details']['marketValue']['compact'],
-                        "fee": transfer['details']['fee']['compact'],
+                        "fee": transfer['details']['fee']['compact'] if transfer['details'].get('fee') else None,
                         "from": {
                             "club_id": transfer['transferSource']['clubId'],
                             "club_name": source_club_name,
@@ -497,7 +497,7 @@ async def get_player_transfers_request(player_id: str):
                 return returnData
                 
     except Exception as e:
-        raise Exception(f"Failed to fetch transfer history: {str(e)}")
+        raise Exception(f"Failed to fetch transfer history: {str(e)}" )
 
 async def scrape_club_profile(club_id: str):
     """
@@ -697,7 +697,6 @@ async def scrape_club_squad(club_id: str):
                 return players
     
     except Exception as e:
-        print(traceback.format_exc())
         raise Exception(f"Failed to scrape squad: {str(e)}")
 
 async def scrape_team_transfers(club_id: int, season: int):
@@ -731,7 +730,7 @@ async def scrape_team_transfers(club_id: int, season: int):
                 club_transfers_cache[(club_id, season)] = transfers
                 return transfers
     except Exception as e:
-        print(f"Error scraping transfers: {str(e)}")
+        raise Exception(f"Error scraping transfers: {str(e)}")
         return []
 
 async def process_transfer_row(row, transfer_type):
@@ -789,7 +788,7 @@ async def process_transfer_row(row, transfer_type):
             "player_image": player_logo
         }
     except Exception as e:
-        print(f"Error processing transfer row: {str(e)}")
+        raise Exception(f"Error processing transfer row: {str(e)}")
         return None
     
 async def scrape_transfers():
@@ -956,7 +955,7 @@ async def scrape_transfermarkt_leagues(search_query: str):
                 return leagues
                 
     except Exception as e:
-        print(f"Error scraping leagues: {e}")
+        raise Exception(f"Error scraping leagues: {e}")
         return []
 
 async def fetch_player_injuries(player_id: str):
@@ -1015,7 +1014,7 @@ async def fetch_player_injuries(player_id: str):
                 return injuries
                 
     except Exception as e:
-        print(f"Error fetching injuries for player {player_id}: {e}")
+        raise Exception(f"Error fetching injuries for player {player_id}: {e}")
         return []
     
 async def search_club_staff(query: str):
@@ -1062,7 +1061,7 @@ async def search_club_staff(query: str):
                 return staff_list
                 
     except Exception as e:
-        print(f"Error searching for staff: {e}")
+        raise Exception(f"Error searching for staff: {e}")
         return []
 
 def extract_staff_data(row):
@@ -1107,7 +1106,7 @@ def extract_staff_data(row):
         }
         
     except Exception as e:
-        print(f"Error extracting staff data: {e}")
+        raise Exception(f"Error extracting staff data: {e}")
         return None
 
 async def get_staff_profile_scraping(staff_id: str):
@@ -1215,7 +1214,7 @@ async def get_staff_profile_scraping(staff_id: str):
                 return profile_data
                 
     except Exception as e:
-        print(f"Error fetching staff profile {staff_id}: {e}")
+        raise Exception(f"Error fetching staff profile {staff_id}: {e}")
         return None
 
 async def get_league_top_scorers(league_code: str, season: str):
@@ -1295,7 +1294,7 @@ async def get_league_top_scorers(league_code: str, season: str):
                 return scorers
                 
     except Exception as e:
-        print(f"Error fetching top scorers for {league_code} season {season}: {e}")
+        raise Exception(f"Error fetching top scorers for {league_code} season {season}: {e}")
         return []
     
 async def get_league_clubs_request(league_code: str):
@@ -1363,7 +1362,7 @@ async def get_league_clubs_request(league_code: str):
                 return clubs
                 
     except Exception as e:
-        print(f"Error fetching league overview for {league_code}: {e}")
+        raise Exception(f"Error fetching league overview for {league_code}: {e}")
         return []
     
 async def get_league_table_request(league_code: str, season: str):
@@ -1447,7 +1446,7 @@ async def get_league_table_request(league_code: str, season: str):
                 return table
                 
     except Exception as e:
-        print(f"Error fetching league table for {league_code} season {season}: {e}")
+        raise Exception(f"Error fetching league table for {league_code} season {season}: {e}")
         return []
 
 async def get_club_fixtures_request(club_id: str):
@@ -1529,7 +1528,7 @@ async def get_club_fixtures_request(club_id: str):
                 return fixtures
                 
     except Exception as e:
-        print(f"Error fetching fixtures for club {club_id}: {e}")
+        raise Exception(f"Error fetching fixtures for club {club_id}: {e}")
         return []
 
 async def get_country_list():
@@ -1569,7 +1568,7 @@ async def get_country_list():
                 return countries
                 
     except Exception as e:
-        print(f"Error fetching country list: {e}")
+        raise Exception(f"Error fetching country list: {e}")
         return []
     
 async def get_foreign_players_request(country_id: str):
@@ -1627,7 +1626,7 @@ async def get_foreign_players_request(country_id: str):
                 return countries
                 
     except Exception as e:
-        print(f"Error fetching foreign players data for country {country_id}: {e}")
+        raise Exception(f"Error fetching foreign players data for country {country_id}: {e}")
         return []
     
 async def get_league_transfers_overview_request(league_code: str, season: int):
@@ -1742,7 +1741,7 @@ async def get_league_transfers_overview_request(league_code: str, season: int):
                 return teams_data
                 
     except Exception as e:
-        print(f"Error fetching transfers for {league_code} season {season}: {e}")
+        raise Exception(f"Error fetching transfers for {league_code} season {season}: {e}")
         return []
 
 def extract_transfer_data_tr(cols):
@@ -1783,6 +1782,9 @@ async def fetch_player_absences(player_id: int):
     Fetches player absences (injuries/suspensions) from Transfermarkt
     Returns a list of dictionaries containing absence details
     """
+    if player_id in player_absences_cache:
+        return player_absences_cache[player_id]
+    
     url = f"https://www.transfermarkt.co.uk/-/ausfaelle/spieler/{player_id}"
     
     absences = []
@@ -1833,9 +1835,11 @@ async def fetch_player_absences(player_id: int):
                         'club': club
                     }
                     absences.append(absence)
-
+                player_absences_cache[player_id] = absences
                 return absences
                 
         except Exception as e:
             print(f"Error fetching absences for player {player_id}: {e}")
             return []
+        
+asyncio.run(get_player_transfers_request(495666))
