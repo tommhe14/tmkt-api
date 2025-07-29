@@ -6,9 +6,7 @@ from urllib.parse import urljoin
 
 from datetime import datetime
 
-import traceback
-
-from .cache import player_search_cache, club_search_cache, player_profile_cache, player_transfers_cache, leagues_search_cache, player_injuries_cache, player_stats_cache, club_profile_cache, club_squad_cache, club_transfers_cache, staff_search_cache, staff_profile_cache, leagues_top_scorers_cache, leagues_clubs_cache, leagues_table_cache, player_injuries_cache, leagues_transfers_overview_cache, club_fixtures_cache, country_list_cache, foreign_players_cache, player_absences_cache
+from .cache import player_search_cache, club_search_cache, player_profile_cache, player_transfers_cache, leagues_search_cache, player_injuries_cache, player_stats_cache, club_profile_cache, club_squad_cache, club_transfers_cache, staff_search_cache, staff_profile_cache, leagues_top_scorers_cache, leagues_clubs_cache, leagues_table_cache, player_injuries_cache, leagues_transfers_overview_cache, club_fixtures_cache, country_list_cache, foreign_players_cache, player_absences_cache, player_national_cache
 
 BASE_URL = "https://www.transfermarkt.co.uk"
 
@@ -270,10 +268,12 @@ async def scrape_player_profile(player_id: str):
             img = trophy.find('img')
             count = trophy.find('span', class_='data-header__success-number')
             if img and count:
+                image_url = img.get('data-src') if 'data:image/gif' in img.get('src', '') else img.get('src')
+                
                 trophies.append({
                     'name': img.get('title', '').replace(' winner', ''),
                     'count': count.get_text(strip=True),
-                    'image': img['src'] if 'src' in img.attrs else None
+                    'image': image_url if image_url and not image_url.startswith('data:image') else None
                 })
 
         result = {
@@ -1831,7 +1831,7 @@ async def fetch_player_absences(player_id: int):
                         'from_date': cells[3].get_text(strip=True),
                         'until_date': cells[4].get_text(strip=True),
                         'duration': cells[5].get_text(strip=True),
-                        'games_missed': cells[6].get_text(strip=True).split()[0],  # Get just the number
+                        'games_missed': cells[6].get_text(strip=True).split()[0],  
                         'club': club
                     }
                     absences.append(absence)
@@ -1841,3 +1841,93 @@ async def fetch_player_absences(player_id: int):
         except Exception as e:
             print(f"Error fetching absences for player {player_id}: {e}")
             return []
+
+async def get_national_team_career(player_id: int):
+    """
+    Scrapes a player's national team career from Transfermarkt.
+    
+    Args:
+        player_id: Transfermarkt player ID
+    """
+    if player_id in player_national_cache:
+        return player_national_cache[player_id]
+    
+    url = f"https://www.transfermarkt.co.uk/-/nationalmannschaft/spieler/{player_id}"
+    
+    try:
+        async with aiohttp.ClientSession(headers=headers) as session:
+            async with session.get(url) as response:
+                if response.status != 200:
+                    return []
+
+                html = await response.text()
+                soup = BeautifulSoup(html, 'html.parser')
+                
+                header = (soup.find('h2', string='National team career') or 
+                         soup.find('h2', string=lambda t: t and 'national team' in t.lower()))
+                
+                if not header:
+                    return []  
+                
+                table = header.find_next('table')
+                if not table:
+                    return []
+                
+                career_data = []
+                current_team = None
+                
+                for row in table.select('tr'):
+                    if 'ueberzeile' in row.get('class', []) or not row.find('td'):
+                        continue
+                    
+                    if 'show-for-small' in row.get('class', []):
+                        team_link = row.find('a')
+                        if team_link:
+                            current_team = {
+                                'name': team_link.get('title', '').strip(),
+                                'id': team_link['href'].split('/')[-1],
+                                'flag': row.find('img')['src'] if row.find('img') else None
+                            }
+                        continue
+                    
+                    cols = row.find_all('td')
+                    if len(cols) < 6:  
+                        continue
+                        
+                    if not current_team:
+                        team_link = cols[2].find('a') if len(cols) > 2 else None
+                        if team_link:
+                            current_team = {
+                                'name': team_link.get('title', '').strip(),
+                                'id': team_link['href'].split('/')[-1],
+                                'flag': cols[1].find('img')['src'] if len(cols) > 1 and cols[1].find('img') else None
+                            }
+                    
+                    if not current_team:
+                        continue
+                        
+                    debut_link = cols[3].find('a')
+                    coach_link = cols[6].find('a') if len(cols) > 6 else None
+                    
+                    career_data.append({
+                        'team': current_team['name'],
+                        'team_id': current_team['id'],
+                        'flag_url': current_team['flag'],
+                        'debut': cols[3].get_text(strip=True),
+                        'debut_match_url': ("https://www.transfermarkt.co.uk" + debut_link['href']) if debut_link else None,
+                        'matches': cols[4].get_text(strip=True),
+                        'goals': cols[5].get_text(strip=True),
+                        'coach': cols[6].get_text(strip=True) if len(cols) > 6 else None,
+                        'coach_id': coach_link['href'].split('/')[-1] if coach_link else None,
+                        'age_at_debut': cols[7].get_text(strip=True) if len(cols) > 7 else None
+                    })
+
+                player_national_cache[player_id] = career_data
+                return career_data
+                
+    except aiohttp.ClientError as e:
+        raise Exception(f"Network error: {str(e)}")
+    except Exception as e:
+        raise Exception(f"Scraping error: {str(e)}")
+    
+    return []  

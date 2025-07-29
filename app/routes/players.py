@@ -1,7 +1,7 @@
 from fastapi import APIRouter, HTTPException, Request
 
-from ..utils.scraping import fetch_transfermarkt_players, scrape_player_profile, scrape_player_stats, get_player_transfers_request, fetch_player_injuries, fetch_player_absences
-from ..utils.cache import player_search_cache, player_profile_cache, player_injuries_cache, player_stats_cache, player_transfers_cache, player_absences_cache
+from ..utils.scraping import fetch_transfermarkt_players, scrape_player_profile, scrape_player_stats, get_player_transfers_request, fetch_player_injuries, fetch_player_absences, get_national_team_career
+from ..utils.cache import player_search_cache, player_profile_cache, player_injuries_cache, player_stats_cache, player_transfers_cache, player_absences_cache, player_national_cache
 from ..utils.rate_limiter import rate_limiter
 
 router = APIRouter()
@@ -159,6 +159,28 @@ async def get_player_absences(
     try:
         data = await fetch_player_absences(player_id)
         return {"query": player_id, "results": data, "cache_hit": player_id in player_absences_cache}
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Error fetching player transfers: {str(e)}"
+        )
+    
+@router.get("/{player_id}/national")
+async def get_player_national_teams(
+    request: Request,
+    player_id: str
+):
+    client_ip = request.client.host
+    
+    await rate_limiter.check_rate_limit(
+        key=f"player_national:{client_ip}", 
+        limit=5, 
+        window=60 
+    )
+
+    try:
+        data = await get_national_team_career(player_id)
+        return {"query": player_id, "results": data, "cache_hit": player_id in player_national_cache}
     except Exception as e:
         raise HTTPException(
             status_code=500,
