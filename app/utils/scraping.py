@@ -273,7 +273,7 @@ async def scrape_player_profile(player_id: str):
                 trophies.append({
                     'name': img.get('title', '').replace(' winner', ''),
                     'count': count.get_text(strip=True),
-                    'image': image_url if image_url and not image_url.startswith('data:image') else None
+                    'image': image_url.replace("header", "medium") if image_url and not image_url.startswith('data:image') else None
                 })
 
         result = {
@@ -288,7 +288,7 @@ async def scrape_player_profile(player_id: str):
             },
             "market_value": market_value,
             "market_value_last_update": market_value_update,
-            "profile_image": header.find('img', class_='data-header__profile-image')['src'] if header.find('img', class_='data-header__profile-image') else None,
+            "profile_image": header.find('img', class_='data-header__profile-image')['src'].replace("header", "medium") if header.find('img', class_='data-header__profile-image') else None,
             "position": position,
             "age": age,
             "birth_date": birth_date,
