@@ -21,7 +21,7 @@ async def search_staff(request: Request, query: str):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-@router.get("{staff_id}/profile")
+@router.get("/{staff_id}/profile")
 async def get_staff_profile(request: Request, staff_id: str):
     client_ip = request.client.host
     
