@@ -22,7 +22,7 @@ async def get_countries(request: Request):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
     
-@router.get("/countries")
+@router.get("/countries/search")
 async def search_countries(request: Request, query: str):
     client_ip = request.client.host
     
