@@ -16,7 +16,7 @@ def search_countries_query(query: str):
     query = query.lower().strip()
     results = []
     
-    for country in countries:
+    for country in countries["results"]:
         if (query in country['id'].lower() or 
             query in country['name'].lower()):
             results.append(country)
