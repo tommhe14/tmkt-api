@@ -1,8 +1,9 @@
 from fastapi import APIRouter, HTTPException, Request
 
-from ..utils.scraping import get_country_list, get_foreign_players_request
-from ..utils.cache import country_list_cache, foreign_players_cache
+from ..utils.scraping import get_foreign_players_request
+from ..utils.cache import foreign_players_cache
 from ..utils.rate_limiter import rate_limiter
+from ..utils.store.management import get_country_list
 
 router = APIRouter()
 
@@ -17,7 +18,7 @@ async def get_countries(request: Request):
     )
     try:
         countries = await get_country_list()
-        return {"query": "get_countries", "results": countries, "cache_hit": "country_list" in country_list_cache}
+        return countries
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
     
