@@ -3,7 +3,7 @@ from fastapi import APIRouter, HTTPException, Request
 from ..utils.scraping import get_foreign_players_request
 from ..utils.cache import foreign_players_cache
 from ..utils.rate_limiter import rate_limiter
-from ..utils.store.management import get_country_list
+from app.utils.store import get_country_list
 
 router = APIRouter()
 
